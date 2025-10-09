@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react"
-import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Stop } from "@phosphor-icons/react"
+import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Check, X, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -86,10 +86,15 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
   const [newMessage, setNewMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
+  const [showRecordingControls, setShowRecordingControls] = useState(false)
+  const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
 
   const activeChat = chats?.find(chat => chat.matchId === activeMatchId)
 
@@ -176,48 +181,30 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       
-      const audioChunks: BlobPart[] = []
+      audioChunksRef.current = []
       
       mediaRecorder.ondataavailable = (event) => {
-        audioChunks.push(event.data)
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
       }
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
         const audioUrl = URL.createObjectURL(audioBlob)
         
-        if (activeChat && recordingTime > 0) {
-          const message: Message = {
-            id: `msg-${Date.now()}`,
-            senderId: "me",
-            text: "",
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            type: 'audio',
-            audioUrl: audioUrl,
-            audioDuration: recordingTime
-          }
-
-          setChats(currentChats => 
-            (currentChats || []).map(chat => 
-              chat.id === activeChat.id 
-                ? { ...chat, messages: [...chat.messages, message] }
-                : chat
-            )
-          )
-          
-          toast.success("Voice message sent!")
-        }
-        
-        // Clean up
-        stream.getTracks().forEach(track => track.stop())
-        setRecordingTime(0)
+        setRecordedAudioBlob(audioBlob)
+        setRecordedAudioUrl(audioUrl)
+        setShowRecordingControls(true)
       }
       
-      mediaRecorder.start()
+      mediaRecorder.start(100) // Collect data every 100ms
       setIsRecording(true)
+      setRecordingTime(0)
       
       // Start timer
       recordingIntervalRef.current = setInterval(() => {
@@ -239,16 +226,76 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
         clearInterval(recordingIntervalRef.current)
         recordingIntervalRef.current = null
       }
+      
+      // Stop all tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
     }
   }
 
-  const handleVoiceMessage = () => {
+  const handleRecordingStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    startRecording()
+  }
+
+  const handleRecordingEnd = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
     if (isRecording) {
       stopRecording()
-    } else {
-      startRecording()
     }
   }
+
+  const sendRecordedMessage = () => {
+    if (!recordedAudioUrl || !activeChat || recordingTime === 0) return
+
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: "me",
+      text: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'audio',
+      audioUrl: recordedAudioUrl,
+      audioDuration: recordingTime
+    }
+
+    setChats(currentChats => 
+      (currentChats || []).map(chat => 
+        chat.id === activeChat.id 
+          ? { ...chat, messages: [...chat.messages, message] }
+          : chat
+      )
+    )
+    
+    toast.success("Voice message sent!")
+    cancelRecording()
+  }
+
+  const cancelRecording = () => {
+    if (recordedAudioUrl) {
+      URL.revokeObjectURL(recordedAudioUrl)
+    }
+    setRecordedAudioBlob(null)
+    setRecordedAudioUrl(null)
+    setShowRecordingControls(false)
+    setRecordingTime(0)
+  }
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (recordedAudioUrl) {
+        URL.revokeObjectURL(recordedAudioUrl)
+      }
+    }
+  }, [])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -438,22 +485,55 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
           className="hidden"
         />
         
-        {isRecording ? (
-          <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-2xl">
+        {/* Recording Controls - Show when audio is recorded */}
+        {showRecordingControls && recordedAudioUrl && (
+          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-2xl mb-2">
             <div className="flex items-center gap-2 flex-1">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-destructive font-medium">Recording: {formatTime(recordingTime)}</span>
+              <Microphone className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium">Voice message ({formatTime(recordingTime)})</span>
+              <audio controls className="flex-1 max-w-xs h-8">
+                <source src={recordedAudioUrl} type="audio/wav" />
+              </audio>
             </div>
             <Button 
-              onClick={stopRecording}
+              onClick={sendRecordedMessage}
               size="sm" 
-              variant="destructive"
               className="rounded-full w-10 h-10 p-0"
             >
-              <Stop className="w-4 h-4" />
+              <Check className="w-4 h-4" />
+            </Button>
+            <Button 
+              onClick={cancelRecording}
+              size="sm" 
+              variant="outline"
+              className="rounded-full w-10 h-10 p-0"
+            >
+              <X className="w-4 h-4" />
             </Button>
           </div>
-        ) : (
+        )}
+        
+        {/* Recording Indicator - Show while recording */}
+        {isRecording && (
+          <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-2xl mb-2">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-destructive font-medium">
+                Recording: {formatTime(recordingTime)}
+              </span>
+              <div className="flex-1 bg-red-100 h-2 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-red-500 transition-all duration-1000 ease-out"
+                  style={{ width: `${Math.min((recordingTime / 60) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+            <span className="text-xs text-muted-foreground">Release to send</span>
+          </div>
+        )}
+        
+        {/* Regular Input - Show when not recording or showing controls */}
+        {!isRecording && !showRecordingControls && (
           <div className="flex items-end gap-2">
             <Button 
               variant="ghost" 
@@ -474,23 +554,29 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
               />
             </div>
             
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="p-2 flex-shrink-0"
-              onClick={handleVoiceMessage}
-            >
-              <Microphone className="w-5 h-5" />
-            </Button>
-            
-            <Button 
-              onClick={sendMessage}
-              disabled={!newMessage.trim()}
-              size="sm"
-              className="p-2 flex-shrink-0 rounded-full w-10 h-10"
-            >
-              <PaperPlaneRight className="w-4 h-4" />
-            </Button>
+            {newMessage.trim() ? (
+              <Button 
+                onClick={sendMessage}
+                size="sm"
+                className="p-2 flex-shrink-0 rounded-full w-10 h-10"
+              >
+                <PaperPlaneRight className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-2 flex-shrink-0 rounded-full w-10 h-10 select-none"
+                onMouseDown={handleRecordingStart}
+                onMouseUp={handleRecordingEnd}
+                onMouseLeave={handleRecordingEnd}
+                onTouchStart={handleRecordingStart}
+                onTouchEnd={handleRecordingEnd}
+                disabled={showRecordingControls}
+              >
+                <Microphone className={cn("w-5 h-5", isRecording && "text-red-500")} />
+              </Button>
+            )}
           </div>
         )}
       </div>
