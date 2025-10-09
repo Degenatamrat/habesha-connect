@@ -19,7 +19,6 @@ interface FilterOptions {
   location: string
   interests: string[]
   religion: string[]
-  ethnicity: string[]
 }
 
 interface FilterBarProps {
@@ -33,11 +32,7 @@ const interestOptions = [
 ]
 
 const religionOptions = [
-  "Orthodox", "Catholic", "Protestant", "Muslim", "Other", "Non-religious"
-]
-
-const ethnicityOptions = [
-  "Ethiopian", "Eritrean", "Sudanese", "Somali", "Djiboutian", "Other"
+  "Orthodox", "Catholic", "Protestant", "Muslim", "Non-religious"
 ]
 
 const locationOptions = [
@@ -57,8 +52,7 @@ export default function FilterBar({ onFiltersChange }: FilterBarProps) {
     ageRange: [18, 50],
     location: "All Locations",
     interests: [],
-    religion: [],
-    ethnicity: []
+    religion: []
   })
 
   const [activeFiltersCount, setActiveFiltersCount] = useState(0)
@@ -73,7 +67,6 @@ export default function FilterBar({ onFiltersChange }: FilterBarProps) {
     if (updatedFilters.location !== "All Locations") count++
     if (updatedFilters.interests.length > 0) count++
     if (updatedFilters.religion.length > 0) count++
-    if (updatedFilters.ethnicity.length > 0) count++
     if (updatedFilters.ageRange[0] !== 18 || updatedFilters.ageRange[1] !== 50) count++
     
     setActiveFiltersCount(count)
@@ -84,15 +77,14 @@ export default function FilterBar({ onFiltersChange }: FilterBarProps) {
       ageRange: [18, 50] as [number, number],
       location: "All Locations",
       interests: [],
-      religion: [],
-      ethnicity: []
+      religion: []
     }
     setFilters(defaultFilters)
     onFiltersChange(defaultFilters)
     setActiveFiltersCount(0)
   }
 
-  const toggleArrayFilter = (category: keyof Pick<FilterOptions, 'interests' | 'religion' | 'ethnicity'>, value: string) => {
+  const toggleArrayFilter = (category: keyof Pick<FilterOptions, 'interests' | 'religion'>, value: string) => {
     const currentArray = filters[category]
     const newArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
@@ -231,28 +223,6 @@ export default function FilterBar({ onFiltersChange }: FilterBarProps) {
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
                         {religion}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Ethnicity */}
-              <div>
-                <h3 className="font-medium mb-3">Heritage</h3>
-                <div className="space-y-2">
-                  {ethnicityOptions.map((ethnicity) => (
-                    <div key={ethnicity} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`ethnicity-${ethnicity}`}
-                        checked={filters.ethnicity.includes(ethnicity)}
-                        onCheckedChange={() => toggleArrayFilter('ethnicity', ethnicity)}
-                      />
-                      <label
-                        htmlFor={`ethnicity-${ethnicity}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {ethnicity}
                       </label>
                     </div>
                   ))}

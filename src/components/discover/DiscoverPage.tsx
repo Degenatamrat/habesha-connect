@@ -12,7 +12,6 @@ interface FilterOptions {
   location: string
   interests: string[]
   religion: string[]
-  ethnicity: string[]
 }
 
 interface UserProfile {
@@ -24,7 +23,6 @@ interface UserProfile {
   interests: string[]
   photos: string[]
   religion?: string
-  ethnicity?: string
 }
 
 const sampleProfiles: UserProfile[] = [
@@ -36,8 +34,7 @@ const sampleProfiles: UserProfile[] = [
     bio: "Coffee enthusiast from Addis. Love exploring new places and trying different cuisines. Looking for someone who shares my passion for travel and culture.",
     interests: ["Travel", "Coffee", "Photography", "Culture"],
     photos: ["https://images.unsplash.com/photo-1494790108755-2616b612b47c?w=400&h=600&fit=crop"],
-    religion: "Orthodox",
-    ethnicity: "Ethiopian"
+    religion: "Orthodox"
   },
   {
     id: "2", 
@@ -47,8 +44,7 @@ const sampleProfiles: UserProfile[] = [
     bio: "Engineer by day, musician by night. Originally from Bahir Dar. Love hiking and playing traditional music. Seeking meaningful connections.",
     interests: ["Music", "Hiking", "Technology", "Traditional Arts"],
     photos: ["https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop"],
-    religion: "Orthodox",
-    ethnicity: "Ethiopian"
+    religion: "Orthodox"
   },
   {
     id: "3",
@@ -58,8 +54,7 @@ const sampleProfiles: UserProfile[] = [
     bio: "Medical student who loves books and cooking traditional food. From Asmara. Looking for someone who appreciates deep conversations and family values.",
     interests: ["Medicine", "Cooking", "Reading", "Family"],
     photos: ["https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=600&fit=crop"],
-    religion: "Catholic",
-    ethnicity: "Eritrean"
+    religion: "Catholic"
   }
 ]
 
@@ -96,11 +91,6 @@ export default function DiscoverPage() {
       // Religion filter
       if (filters.religion.length > 0 && profile.religion) {
         if (!filters.religion.includes(profile.religion)) return false
-      }
-      
-      // Ethnicity filter
-      if (filters.ethnicity.length > 0 && profile.ethnicity) {
-        if (!filters.ethnicity.includes(profile.ethnicity)) return false
       }
       
       return true
@@ -228,9 +218,6 @@ export default function DiscoverPage() {
               <div className="flex gap-4 text-xs text-muted-foreground">
                 {currentProfile.religion && (
                   <span>🕊️ {currentProfile.religion}</span>
-                )}
-                {currentProfile.ethnicity && (
-                  <span>🌍 {currentProfile.ethnicity}</span>
                 )}
               </div>
             </CardContent>

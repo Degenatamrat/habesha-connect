@@ -13,7 +13,6 @@ interface UserProfile {
   interests: string[]
   photos: string[]
   religion?: string
-  ethnicity?: string
   languages?: string[]
   profession?: string
 }
@@ -26,7 +25,6 @@ const defaultProfile: UserProfile = {
   interests: ["Travel", "Coffee", "Photography"],
   photos: ["https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=600&fit=crop"],
   religion: "Orthodox",
-  ethnicity: "Ethiopian",
   languages: ["Amharic", "English", "Arabic"],
   profession: "Software Engineer"
 }
@@ -68,9 +66,6 @@ export default function ProfilePage() {
               <div className="flex gap-2 mb-4 flex-wrap justify-center">
                 <Badge variant="secondary" className="text-xs">
                   🕊️ {profile.religion}
-                </Badge>
-                <Badge variant="secondary" className="text-xs">
-                  🌍 {profile.ethnicity}
                 </Badge>
               </div>
 
