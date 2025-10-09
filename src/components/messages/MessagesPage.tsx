@@ -532,8 +532,8 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
           </div>
         )}
         
-        {/* Regular Input - Show when not recording or showing controls */}
-        {!isRecording && !showRecordingControls && (
+        {/* Text Input - Always show unless actively recording */}
+        {!isRecording && (
           <div className="flex items-end gap-2">
             <Button 
               variant="ghost" 
@@ -554,27 +554,33 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
               />
             </div>
             
-            <Button 
-              onClick={newMessage.trim() ? sendMessage : undefined}
-              onMouseDown={!newMessage.trim() ? handleRecordingStart : undefined}
-              onMouseUp={!newMessage.trim() ? handleRecordingEnd : undefined}
-              onMouseLeave={!newMessage.trim() ? handleRecordingEnd : undefined}
-              onTouchStart={!newMessage.trim() ? handleRecordingStart : undefined}
-              onTouchEnd={!newMessage.trim() ? handleRecordingEnd : undefined}
-              variant={newMessage.trim() ? "default" : "ghost"}
-              size="sm"
-              className={cn(
-                "p-2 flex-shrink-0 rounded-full w-10 h-10",
-                !newMessage.trim() && "select-none"
-              )}
-              disabled={showRecordingControls}
-            >
-              {newMessage.trim() ? (
+            {/* Send button for text messages - always show when there's text */}
+            {newMessage.trim() && (
+              <Button 
+                onClick={sendMessage}
+                variant="default"
+                size="sm"
+                className="p-2 flex-shrink-0 rounded-full w-10 h-10"
+              >
                 <PaperPlaneRight className="w-4 h-4" />
-              ) : (
-                <Microphone className={cn("w-5 h-5", isRecording && "text-red-500")} />
-              )}
-            </Button>
+              </Button>
+            )}
+            
+            {/* Voice recording button - show when no text and no recording controls */}
+            {!newMessage.trim() && !showRecordingControls && (
+              <Button 
+                onMouseDown={handleRecordingStart}
+                onMouseUp={handleRecordingEnd}
+                onMouseLeave={handleRecordingEnd}
+                onTouchStart={handleRecordingStart}
+                onTouchEnd={handleRecordingEnd}
+                variant="ghost"
+                size="sm"
+                className="p-2 flex-shrink-0 rounded-full w-10 h-10 select-none"
+              >
+                <Microphone className="w-5 h-5" />
+              </Button>
+            )}
           </div>
         )}
       </div>
