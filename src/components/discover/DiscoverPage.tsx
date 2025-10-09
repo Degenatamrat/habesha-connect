@@ -5,6 +5,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useKV } from "@github/spark/hooks"
 import { cn } from "@/lib/utils"
+import FilterBar from "./FilterBar"
+
+interface FilterOptions {
+  ageRange: [number, number]
+  location: string
+  interests: string[]
+  religion: string[]
+  ethnicity: string[]
+}
 
 interface UserProfile {
   id: string
@@ -59,9 +68,48 @@ export default function DiscoverPage() {
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null)
   const [matches, setMatches] = useKV<string[]>("user-matches", [])
   const [passes, setPasses] = useKV<string[]>("user-passes", [])
+  const [filteredProfiles, setFilteredProfiles] = useState<UserProfile[]>(sampleProfiles)
   
-  const currentProfile = sampleProfiles[currentProfileIndex]
+  const currentProfile = filteredProfiles[currentProfileIndex]
   
+  const handleFiltersChange = (filters: FilterOptions) => {
+    // Apply filters to profiles
+    let filtered = sampleProfiles.filter(profile => {
+      // Age range filter
+      if (profile.age < filters.ageRange[0] || profile.age > filters.ageRange[1]) {
+        return false
+      }
+      
+      // Location filter
+      if (filters.location !== "All Locations" && !profile.location.includes(filters.location.split(",")[0])) {
+        return false
+      }
+      
+      // Interests filter
+      if (filters.interests.length > 0) {
+        const hasMatchingInterest = filters.interests.some(interest => 
+          profile.interests.includes(interest)
+        )
+        if (!hasMatchingInterest) return false
+      }
+      
+      // Religion filter
+      if (filters.religion.length > 0 && profile.religion) {
+        if (!filters.religion.includes(profile.religion)) return false
+      }
+      
+      // Ethnicity filter
+      if (filters.ethnicity.length > 0 && profile.ethnicity) {
+        if (!filters.ethnicity.includes(profile.ethnicity)) return false
+      }
+      
+      return true
+    })
+    
+    setFilteredProfiles(filtered)
+    setCurrentProfileIndex(0) // Reset to first profile when filters change
+  }
+
   const handleSwipe = (direction: "left" | "right") => {
     if (!currentProfile) return
     
@@ -83,25 +131,36 @@ export default function DiscoverPage() {
     setCurrentProfileIndex(0)
     setMatches([])
     setPasses([])
+    setFilteredProfiles(sampleProfiles) // Reset filtered profiles too
   }
 
-  if (currentProfileIndex >= sampleProfiles.length) {
+  if (currentProfileIndex >= filteredProfiles.length) {
+    const isFiltered = filteredProfiles.length < sampleProfiles.length
+    
     return (
-      <div className="h-full flex items-center justify-center p-4">
-        <Card className="w-[280px] sm:w-[300px] md:w-[320px] text-center">
-          <CardContent className="p-6">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">That's everyone for now!</h3>
-            <p className="text-muted-foreground mb-6 text-sm">
-              Check back later for more profiles in your area.
-            </p>
-            <Button onClick={resetProfiles} className="w-full">
-              Start Over
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="h-full flex flex-col">
+        <FilterBar onFiltersChange={handleFiltersChange} />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-[280px] sm:w-[300px] md:w-[320px] text-center">
+            <CardContent className="p-6">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <Heart className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                {isFiltered ? "No more matches with current filters" : "That's everyone for now!"}
+              </h3>
+              <p className="text-muted-foreground mb-6 text-sm">
+                {isFiltered 
+                  ? "Try adjusting your filters to see more profiles." 
+                  : "Check back later for more profiles in your area."
+                }
+              </p>
+              <Button onClick={resetProfiles} className="w-full">
+                {isFiltered ? "Reset Filters" : "Start Over"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -109,7 +168,12 @@ export default function DiscoverPage() {
   if (!currentProfile) return null
 
   return (
-    <div className="h-full flex flex-col p-3 md:p-6">
+    <div className="h-full flex flex-col">
+      {/* Fixed Filter Bar */}
+      <FilterBar onFiltersChange={handleFiltersChange} />
+      
+      {/* Swipeable Cards Area */}
+      <div className="flex-1 flex flex-col p-3 md:p-6">
       <div className="flex-1 flex flex-col mx-auto w-full">
         {/* Profile Card - Fixed dimensions with mobile scaling */}
         <div className="flex-1 flex flex-col items-center justify-center mb-4">
@@ -204,8 +268,9 @@ export default function DiscoverPage() {
 
         {/* Progress indicator */}
         <div className="text-center text-xs text-muted-foreground pb-1">
-          {currentProfileIndex + 1} of {sampleProfiles.length}
+          {currentProfileIndex + 1} of {filteredProfiles.length}
         </div>
+      </div>
       </div>
     </div>
   )
