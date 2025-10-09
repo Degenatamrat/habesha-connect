@@ -87,14 +87,14 @@ export default function DiscoverPage() {
 
   if (currentProfileIndex >= sampleProfiles.length) {
     return (
-      <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-6">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="p-8">
+      <div className="h-full flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm text-center">
+          <CardContent className="p-6">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Heart className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">That's everyone for now!</h3>
-            <p className="text-muted-foreground mb-6">
+            <h3 className="text-lg font-semibold mb-2">That's everyone for now!</h3>
+            <p className="text-muted-foreground mb-6 text-sm">
               Check back later for more profiles in your area.
             </p>
             <Button onClick={resetProfiles} className="w-full">
@@ -109,16 +109,16 @@ export default function DiscoverPage() {
   if (!currentProfile) return null
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] p-4 md:p-6">
-      <div className="max-w-md mx-auto">
-        {/* Profile Card */}
-        <div className="relative mb-6">
+    <div className="h-full flex flex-col p-3 md:p-6">
+      <div className="flex-1 flex flex-col max-w-sm mx-auto w-full">
+        {/* Profile Card - Optimized for mobile viewing */}
+        <div className="flex-1 flex flex-col min-h-0 mb-4">
           <Card className={cn(
-            "overflow-hidden transition-transform duration-300",
+            "overflow-hidden transition-transform duration-300 flex-1 flex flex-col",
             swipeDirection === "left" && "transform -translate-x-full rotate-12 opacity-0",
             swipeDirection === "right" && "transform translate-x-full -rotate-12 opacity-0"
           )}>
-            <div className="aspect-[3/4] relative">
+            <div className="flex-1 relative min-h-0">
               <img 
                 src={currentProfile.photos[0]} 
                 alt={currentProfile.name}
@@ -126,23 +126,27 @@ export default function DiscoverPage() {
               />
               
               {/* Gradient overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
               
               {/* Profile info overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-2xl font-bold">{currentProfile.name}</h2>
-                  <span className="text-xl">{currentProfile.age}</span>
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <h2 className="text-xl md:text-2xl font-bold text-white">{currentProfile.name}</h2>
+                  <span className="text-lg md:text-xl text-white/90">{currentProfile.age}</span>
                 </div>
                 
                 <div className="flex items-center gap-1 mb-3">
-                  <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{currentProfile.location}</span>
+                  <MapPin className="w-4 h-4 text-white/80" />
+                  <span className="text-sm text-white/80">{currentProfile.location}</span>
                 </div>
 
                 <div className="flex flex-wrap gap-1">
                   {currentProfile.interests.slice(0, 3).map((interest) => (
-                    <Badge key={interest} variant="secondary" className="text-xs">
+                    <Badge 
+                      key={interest} 
+                      variant="secondary" 
+                      className="text-xs bg-white/20 text-white border-white/30 hover:bg-white/30"
+                    >
                       {interest}
                     </Badge>
                   ))}
@@ -150,12 +154,12 @@ export default function DiscoverPage() {
               </div>
             </div>
             
-            <CardContent className="p-6">
-              <p className="text-foreground leading-relaxed mb-4">
+            <CardContent className="p-4 flex-shrink-0">
+              <p className="text-foreground leading-relaxed text-sm mb-3">
                 {currentProfile.bio}
               </p>
               
-              <div className="flex gap-4 text-sm text-muted-foreground">
+              <div className="flex gap-4 text-xs text-muted-foreground">
                 {currentProfile.religion && (
                   <span>🕊️ {currentProfile.religion}</span>
                 )}
@@ -167,37 +171,37 @@ export default function DiscoverPage() {
           </Card>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center gap-6">
+        {/* Action Buttons - Mobile optimized */}
+        <div className="flex items-center justify-center gap-4 px-2 pb-2">
           <Button
             variant="outline"
             size="lg"
-            className="w-16 h-16 rounded-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            className="w-14 h-14 rounded-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-transform shadow-lg"
             onClick={() => handleSwipe("left")}
           >
-            <X className="w-8 h-8" weight="bold" />
+            <X className="w-7 h-7" weight="bold" />
           </Button>
           
           <Button
             variant="outline"
             size="lg" 
-            className="w-12 h-12 rounded-full border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+            className="w-12 h-12 rounded-full border-accent text-accent hover:bg-accent hover:text-accent-foreground active:scale-95 transition-transform shadow-lg"
           >
-            <Star className="w-6 h-6" weight="fill" />
+            <Star className="w-5 h-5" weight="fill" />
           </Button>
           
           <Button
             variant="outline"
             size="lg"
-            className="w-16 h-16 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            className="w-14 h-14 rounded-full border-primary text-primary hover:bg-primary hover:text-primary-foreground active:scale-95 transition-transform shadow-lg"
             onClick={() => handleSwipe("right")}
           >
-            <Heart className="w-8 h-8" weight="fill" />
+            <Heart className="w-7 h-7" weight="fill" />
           </Button>
         </div>
 
         {/* Progress indicator */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
+        <div className="text-center text-xs text-muted-foreground pb-1">
           {currentProfileIndex + 1} of {sampleProfiles.length}
         </div>
       </div>

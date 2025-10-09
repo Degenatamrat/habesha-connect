@@ -8,6 +8,44 @@
   
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+    /* Better touch scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 768px) {
+    /* Prevent zoom on inputs in iOS Safari */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea {
+      font-size: 16px;
+    }
+    
+    /* Better tap targets */
+    button, 
+    [role="button"],
+    input[type="submit"],
+    input[type="button"] {
+      touch-action: manipulation;
+    }
+  }
+}
+
+/* Safe area support for mobile devices */
+@supports (padding: max(0px)) {
+  .safe-area-inset-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  
+  .safe-area-inset-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
   }
 }
 

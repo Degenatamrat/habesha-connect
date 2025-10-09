@@ -126,63 +126,67 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
     const userChats = chats || []
     
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Messages</h1>
-          <p className="text-muted-foreground">
+      <div className="h-full flex flex-col">
+        <div className="flex-shrink-0 p-4 pb-2">
+          <h1 className="text-xl font-bold text-foreground mb-1">Messages</h1>
+          <p className="text-muted-foreground text-sm">
             {userChats.length} active {userChats.length === 1 ? 'conversation' : 'conversations'}
           </p>
         </div>
 
-        {userChats.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <PaperPlaneRight className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No messages yet</h3>
-              <p className="text-muted-foreground">
-                Start a conversation with your matches!
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {userChats.map((chat) => {
-              const lastMessage = chat.messages[chat.messages.length - 1]
-              return (
-                <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <img 
-                          src={chat.matchPhoto} 
-                          alt={chat.matchName}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                        {chat.lastActive === "Online" && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-background"></div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-semibold truncate">{chat.matchName}</h3>
-                          <span className="text-xs text-muted-foreground">{chat.lastActive}</span>
+        <div className="flex-1 overflow-auto px-4 pb-4">
+          {userChats.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <Card className="text-center w-full max-w-sm">
+                <CardContent className="p-6">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                    <PaperPlaneRight className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">No messages yet</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Start a conversation with your matches!
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {userChats.map((chat) => {
+                const lastMessage = chat.messages[chat.messages.length - 1]
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform">
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <img 
+                            src={chat.matchPhoto} 
+                            alt={chat.matchName}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                          {chat.lastActive === "Online" && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
+                          )}
                         </div>
-                        {lastMessage && (
-                          <p className="text-sm text-muted-foreground truncate">
-                            {lastMessage.senderId === "me" ? "You: " : ""}{lastMessage.text}
-                          </p>
-                        )}
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-semibold truncate text-sm">{chat.matchName}</h3>
+                            <span className="text-xs text-muted-foreground">{chat.lastActive}</span>
+                          </div>
+                          {lastMessage && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {lastMessage.senderId === "me" ? "You: " : ""}{lastMessage.text}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -197,33 +201,33 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Chat Header */}
-      <div className="bg-card border-b border-border p-4">
+      <div className="bg-card/95 backdrop-blur-sm border-b border-border/50 px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBackToMatches}>
+          <Button variant="ghost" size="sm" onClick={onBackToMatches} className="p-1">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
           <img 
             src={activeChat.matchPhoto} 
             alt={activeChat.matchName}
-            className="w-10 h-10 rounded-full object-cover"
+            className="w-9 h-9 rounded-full object-cover"
           />
           
-          <div className="flex-1">
-            <h2 className="font-semibold">{activeChat.matchName}</h2>
-            <p className="text-sm text-muted-foreground">{activeChat.lastActive}</p>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-sm truncate">{activeChat.matchName}</h2>
+            <p className="text-xs text-muted-foreground truncate">{activeChat.lastActive}</p>
           </div>
           
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="p-1">
             <DotsThreeVertical className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-muted/20">
         {activeChat.messages.map((message) => (
           <div 
             key={message.id}
@@ -233,12 +237,12 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
             )}
           >
             <div className={cn(
-              "max-w-[80%] rounded-2xl px-4 py-2",
+              "max-w-[85%] rounded-2xl px-3 py-2 shadow-sm",
               message.senderId === "me" 
                 ? "bg-primary text-primary-foreground rounded-br-md"
-                : "bg-muted text-foreground rounded-bl-md"
+                : "bg-card text-foreground rounded-bl-md border border-border/50"
             )}>
-              <p className="text-sm">{message.text}</p>
+              <p className="text-sm leading-relaxed">{message.text}</p>
               <p className={cn(
                 "text-xs mt-1",
                 message.senderId === "me" 
@@ -254,23 +258,23 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
       </div>
 
       {/* Message Input */}
-      <div className="bg-card border-t border-border p-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm">
+      <div className="bg-card/95 backdrop-blur-sm border-t border-border/50 p-3 flex-shrink-0 safe-area-inset-bottom">
+        <div className="flex items-end gap-2">
+          <Button variant="ghost" size="sm" className="p-2 flex-shrink-0">
             <Image className="w-5 h-5" />
           </Button>
           
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
-              className="border-0 focus-visible:ring-1"
+              className="border-0 focus-visible:ring-1 rounded-2xl bg-muted/50 resize-none min-h-[40px] py-2"
             />
           </div>
           
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className="p-2 flex-shrink-0">
             <Microphone className="w-5 h-5" />
           </Button>
           
@@ -278,8 +282,9 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
             onClick={sendMessage}
             disabled={!newMessage.trim()}
             size="sm"
+            className="p-2 flex-shrink-0 rounded-full w-10 h-10"
           >
-            <PaperPlaneRight className="w-5 h-5" />
+            <PaperPlaneRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
