@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react"
-import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical } from "@phosphor-icons/react"
+import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Stop } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useKV } from "@github/spark/hooks"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface Message {
   id: string
@@ -12,6 +13,9 @@ interface Message {
   text: string
   timestamp: string
   type: 'text' | 'image' | 'audio'
+  imageUrl?: string
+  audioUrl?: string
+  audioDuration?: number
 }
 
 interface Chat {
@@ -80,7 +84,12 @@ interface MessagesPageProps {
 export default function MessagesPage({ activeMatchId, onBackToMatches }: MessagesPageProps) {
   const [chats, setChats] = useKV<Chat[]>("user-chats", sampleChats)
   const [newMessage, setNewMessage] = useState("")
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const activeChat = chats?.find(chat => chat.matchId === activeMatchId)
 
@@ -119,6 +128,132 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
       e.preventDefault()
       sendMessage()
     }
+  }
+
+  const handleImageUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !activeChat) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please select an image file")
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error("Image must be less than 5MB")
+      return
+    }
+
+    // Create a URL for the image
+    const imageUrl = URL.createObjectURL(file)
+    
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: "me",
+      text: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'image',
+      imageUrl: imageUrl
+    }
+
+    setChats(currentChats => 
+      (currentChats || []).map(chat => 
+        chat.id === activeChat.id 
+          ? { ...chat, messages: [...chat.messages, message] }
+          : chat
+      )
+    )
+
+    toast.success("Image sent!")
+    // Reset file input
+    e.target.value = ""
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      
+      const audioChunks: BlobPart[] = []
+      
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data)
+      }
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+        const audioUrl = URL.createObjectURL(audioBlob)
+        
+        if (activeChat && recordingTime > 0) {
+          const message: Message = {
+            id: `msg-${Date.now()}`,
+            senderId: "me",
+            text: "",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            type: 'audio',
+            audioUrl: audioUrl,
+            audioDuration: recordingTime
+          }
+
+          setChats(currentChats => 
+            (currentChats || []).map(chat => 
+              chat.id === activeChat.id 
+                ? { ...chat, messages: [...chat.messages, message] }
+                : chat
+            )
+          )
+          
+          toast.success("Voice message sent!")
+        }
+        
+        // Clean up
+        stream.getTracks().forEach(track => track.stop())
+        setRecordingTime(0)
+      }
+      
+      mediaRecorder.start()
+      setIsRecording(true)
+      
+      // Start timer
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+      
+    } catch (error) {
+      console.error('Error accessing microphone:', error)
+      toast.error("Could not access microphone. Please check permissions.")
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+        recordingIntervalRef.current = null
+      }
+    }
+  }
+
+  const handleVoiceMessage = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   // Chat List View
@@ -237,20 +372,56 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
             )}
           >
             <div className={cn(
-              "max-w-[85%] rounded-2xl px-3 py-2 shadow-sm",
+              "max-w-[85%] rounded-2xl shadow-sm",
               message.senderId === "me" 
                 ? "bg-primary text-primary-foreground rounded-br-md"
                 : "bg-card text-foreground rounded-bl-md border border-border/50"
             )}>
-              <p className="text-sm leading-relaxed">{message.text}</p>
-              <p className={cn(
-                "text-xs mt-1",
-                message.senderId === "me" 
-                  ? "text-primary-foreground/70"
-                  : "text-muted-foreground"
+              {message.type === 'text' && (
+                <div className="px-3 py-2">
+                  <p className="text-sm leading-relaxed">{message.text}</p>
+                </div>
+              )}
+              
+              {message.type === 'image' && message.imageUrl && (
+                <div className="p-1">
+                  <img 
+                    src={message.imageUrl} 
+                    alt="Shared image" 
+                    className="max-w-full rounded-xl max-h-64 object-cover"
+                  />
+                </div>
+              )}
+              
+              {message.type === 'audio' && message.audioUrl && (
+                <div className="px-3 py-2 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center">
+                    <Microphone className="w-3 h-3" />
+                  </div>
+                  <div className="flex-1">
+                    <audio controls className="w-full h-8" style={{ maxWidth: '200px' }}>
+                      <source src={message.audioUrl} type="audio/wav" />
+                    </audio>
+                  </div>
+                  {message.audioDuration && (
+                    <span className="text-xs opacity-70">{formatTime(message.audioDuration)}</span>
+                  )}
+                </div>
+              )}
+              
+              <div className={cn(
+                "px-3 pb-2 pt-0",
+                message.type === 'image' && "pt-1"
               )}>
-                {message.timestamp}
-              </p>
+                <p className={cn(
+                  "text-xs",
+                  message.senderId === "me" 
+                    ? "text-primary-foreground/70"
+                    : "text-muted-foreground"
+                )}>
+                  {message.timestamp}
+                </p>
+              </div>
             </div>
           </div>
         ))}
@@ -259,34 +430,69 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
 
       {/* Message Input */}
       <div className="bg-card/95 backdrop-blur-sm border-t border-border/50 p-3 flex-shrink-0 safe-area-inset-bottom">
-        <div className="flex items-end gap-2">
-          <Button variant="ghost" size="sm" className="p-2 flex-shrink-0">
-            <Image className="w-5 h-5" />
-          </Button>
-          
-          <div className="flex-1 min-w-0">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              className="border-0 focus-visible:ring-1 rounded-2xl bg-muted/50 resize-none min-h-[40px] py-2"
-            />
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          accept="image/*"
+          className="hidden"
+        />
+        
+        {isRecording ? (
+          <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-2xl">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-destructive font-medium">Recording: {formatTime(recordingTime)}</span>
+            </div>
+            <Button 
+              onClick={stopRecording}
+              size="sm" 
+              variant="destructive"
+              className="rounded-full w-10 h-10 p-0"
+            >
+              <Stop className="w-4 h-4" />
+            </Button>
           </div>
-          
-          <Button variant="ghost" size="sm" className="p-2 flex-shrink-0">
-            <Microphone className="w-5 h-5" />
-          </Button>
-          
-          <Button 
-            onClick={sendMessage}
-            disabled={!newMessage.trim()}
-            size="sm"
-            className="p-2 flex-shrink-0 rounded-full w-10 h-10"
-          >
-            <PaperPlaneRight className="w-4 h-4" />
-          </Button>
-        </div>
+        ) : (
+          <div className="flex items-end gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="p-2 flex-shrink-0"
+              onClick={handleImageUpload}
+            >
+              <Image className="w-5 h-5" />
+            </Button>
+            
+            <div className="flex-1 min-w-0">
+              <Input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type a message..."
+                className="border-0 focus-visible:ring-1 rounded-2xl bg-muted/50 resize-none min-h-[40px] py-2"
+              />
+            </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="p-2 flex-shrink-0"
+              onClick={handleVoiceMessage}
+            >
+              <Microphone className="w-5 h-5" />
+            </Button>
+            
+            <Button 
+              onClick={sendMessage}
+              disabled={!newMessage.trim()}
+              size="sm"
+              className="p-2 flex-shrink-0 rounded-full w-10 h-10"
+            >
+              <PaperPlaneRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

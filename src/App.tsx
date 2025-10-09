@@ -7,6 +7,7 @@ import ProfilePage from "@/components/profile/ProfilePage"
 import AdminAuth from "@/components/auth/AdminAuth"
 import WelcomeScreen from "@/components/onboarding/WelcomeScreen"
 import { useKV } from "@github/spark/hooks"
+import { Toaster } from "@/components/ui/sonner"
 
 function App() {
   const [activeTab, setActiveTab] = useState("discover")
@@ -67,9 +68,12 @@ function App() {
   }
 
   return (
-    <Layout currentTab={activeTab} onTabChange={setActiveTab}>
-      {renderContent()}
-    </Layout>
+    <>
+      <Layout currentTab={activeTab} onTabChange={setActiveTab}>
+        {renderContent()}
+      </Layout>
+      <Toaster position="top-center" />
+    </>
   )
 }
 
