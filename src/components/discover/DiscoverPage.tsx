@@ -88,7 +88,7 @@ export default function DiscoverPage() {
   if (currentProfileIndex >= sampleProfiles.length) {
     return (
       <div className="h-full flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm text-center">
+        <Card className="w-[280px] sm:w-[300px] md:w-[320px] text-center">
           <CardContent className="p-6">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Heart className="w-8 h-8 text-muted-foreground" />
@@ -110,15 +110,17 @@ export default function DiscoverPage() {
 
   return (
     <div className="h-full flex flex-col p-3 md:p-6">
-      <div className="flex-1 flex flex-col max-w-sm mx-auto w-full">
-        {/* Profile Card - Optimized for mobile viewing */}
-        <div className="flex-1 flex flex-col min-h-0 mb-4">
+      <div className="flex-1 flex flex-col mx-auto w-full">
+        {/* Profile Card - Fixed dimensions with mobile scaling */}
+        <div className="flex-1 flex flex-col items-center justify-center mb-4">
           <Card className={cn(
-            "overflow-hidden transition-transform duration-300 flex-1 flex flex-col",
+            "overflow-hidden transition-transform duration-300 flex flex-col",
+            // Fixed dimensions: 320px × 420px on desktop, scaled proportionally on mobile
+            "w-[280px] h-[370px] sm:w-[300px] sm:h-[395px] md:w-[320px] md:h-[420px]",
             swipeDirection === "left" && "transform -translate-x-full rotate-12 opacity-0",
             swipeDirection === "right" && "transform translate-x-full -rotate-12 opacity-0"
           )}>
-            <div className="flex-1 relative min-h-0">
+            <div className="flex-1 relative">
               <img 
                 src={currentProfile.photos[0]} 
                 alt={currentProfile.name}

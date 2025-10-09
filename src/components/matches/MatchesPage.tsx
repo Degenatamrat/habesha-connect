@@ -42,7 +42,7 @@ export default function MatchesPage({ onStartChat }: MatchesPageProps) {
   if (!filteredMatches.length) {
     return (
       <div className="h-full flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm text-center">
+        <Card className="w-[280px] sm:w-[300px] md:w-[320px] text-center">
           <CardContent className="p-6">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <Heart className="w-8 h-8 text-muted-foreground" />
