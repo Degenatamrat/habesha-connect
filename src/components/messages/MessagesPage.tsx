@@ -554,29 +554,27 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
               />
             </div>
             
-            {newMessage.trim() ? (
-              <Button 
-                onClick={sendMessage}
-                size="sm"
-                className="p-2 flex-shrink-0 rounded-full w-10 h-10"
-              >
+            <Button 
+              onClick={newMessage.trim() ? sendMessage : undefined}
+              onMouseDown={!newMessage.trim() ? handleRecordingStart : undefined}
+              onMouseUp={!newMessage.trim() ? handleRecordingEnd : undefined}
+              onMouseLeave={!newMessage.trim() ? handleRecordingEnd : undefined}
+              onTouchStart={!newMessage.trim() ? handleRecordingStart : undefined}
+              onTouchEnd={!newMessage.trim() ? handleRecordingEnd : undefined}
+              variant={newMessage.trim() ? "default" : "ghost"}
+              size="sm"
+              className={cn(
+                "p-2 flex-shrink-0 rounded-full w-10 h-10",
+                !newMessage.trim() && "select-none"
+              )}
+              disabled={showRecordingControls}
+            >
+              {newMessage.trim() ? (
                 <PaperPlaneRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="p-2 flex-shrink-0 rounded-full w-10 h-10 select-none"
-                onMouseDown={handleRecordingStart}
-                onMouseUp={handleRecordingEnd}
-                onMouseLeave={handleRecordingEnd}
-                onTouchStart={handleRecordingStart}
-                onTouchEnd={handleRecordingEnd}
-                disabled={showRecordingControls}
-              >
+              ) : (
                 <Microphone className={cn("w-5 h-5", isRecording && "text-red-500")} />
-              </Button>
-            )}
+              )}
+            </Button>
           </div>
         )}
       </div>
