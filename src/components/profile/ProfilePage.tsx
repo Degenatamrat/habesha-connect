@@ -23,6 +23,7 @@ interface UserProfile {
   religion?: string
   languages?: string[]
   profession?: string
+  phoneNumber?: string
 }
 
 const defaultProfile: UserProfile = {
@@ -34,12 +35,13 @@ const defaultProfile: UserProfile = {
   photos: ["https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=600&fit=crop"],
   religion: "Orthodox",
   languages: ["Amharic", "English", "Arabic"],
-  profession: "Software Engineer"
+  profession: "Software Engineer",
+  phoneNumber: "+971 50 123 4567"
 }
 
 export default function ProfilePage() {
   const { signOut, deleteAccount, user } = useAuth()
-  const [profile, setProfile] = useKV<UserProfile>("user-profile", defaultProfile)
+  const [profile, setProfile] = useKV<UserProfile | null>("user-profile", null)
   const [editMode, setEditMode] = useState(false)
   const [editData, setEditData] = useState<UserProfile>(defaultProfile)
   const [showAccountSettings, setShowAccountSettings] = useState(false)
@@ -47,7 +49,11 @@ export default function ProfilePage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  if (!profile) return null
+  // Initialize profile with user's name if profile doesn't exist yet
+  const actualProfile: UserProfile = profile || { 
+    ...defaultProfile, 
+    name: user?.name || defaultProfile.name 
+  }
 
   const handleEditMode = () => {
     if (editMode) {
@@ -57,7 +63,7 @@ export default function ProfilePage() {
       toast.success("Profile updated successfully!")
     } else {
       // Enter edit mode
-      setEditData(profile)
+      setEditData(actualProfile)
       setEditMode(true)
     }
   }
@@ -88,11 +94,11 @@ export default function ProfilePage() {
         photos: [imageUrl, ...(prev?.photos || [])].slice(0, 5)
       }))
     } else {
-      setProfile((prev: UserProfile | undefined) => {
-        if (!prev) return defaultProfile
+      setProfile((prev: UserProfile | null) => {
+        const currentProfile = prev || actualProfile
         return {
-          ...prev,
-          photos: [imageUrl, ...prev.photos].slice(0, 5)
+          ...currentProfile,
+          photos: [imageUrl, ...currentProfile.photos].slice(0, 5)
         }
       })
     }
@@ -113,7 +119,7 @@ export default function ProfilePage() {
   const addInterest = () => {
     if (!newInterest.trim()) return
     
-    const currentInterests = editMode ? editData.interests : profile.interests
+    const currentInterests = editMode ? editData.interests : actualProfile.interests
     if (currentInterests.includes(newInterest)) {
       toast.error("Interest already added")
       return
@@ -125,11 +131,11 @@ export default function ProfilePage() {
         interests: [...(prev?.interests || []), newInterest.trim()]
       }))
     } else {
-      setProfile((prev: UserProfile | undefined) => {
-        if (!prev) return defaultProfile
+      setProfile((prev: UserProfile | null) => {
+        const currentProfile = prev || actualProfile
         return {
-          ...prev,
-          interests: [...prev.interests, newInterest.trim()]
+          ...currentProfile,
+          interests: [...currentProfile.interests, newInterest.trim()]
         }
       })
     }
@@ -147,7 +153,7 @@ export default function ProfilePage() {
     }
   }
 
-  const displayProfile = editMode ? editData : profile
+  const displayProfile = editMode ? editData : actualProfile
 
   const handleSignOut = () => {
     signOut()
@@ -432,6 +438,7 @@ export default function ProfilePage() {
                       id="phone" 
                       type="tel" 
                       placeholder="+971 50 123 4567"
+                      defaultValue={displayProfile.phoneNumber || ""}
                     />
                   </div>
                   <div className="space-y-2">

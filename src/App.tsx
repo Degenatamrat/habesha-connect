@@ -7,12 +7,13 @@ import ProfilePage from "@/components/profile/ProfilePage"
 import AdminAuth from "@/components/auth/AdminAuth"
 import AuthScreen from "@/components/auth/AuthScreen"
 import WelcomeScreen from "@/components/onboarding/WelcomeScreen"
+import ProfileCompletion from "@/components/onboarding/ProfileCompletion"
 import { AuthProvider, useAuth } from "@/components/auth/AuthContext"
 import { useKV } from "@github/spark/hooks"
 import { Toaster } from "@/components/ui/sonner"
 
 function AppContent() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [activeTab, setActiveTab] = useState("discover")
   const [activeChatMatchId, setActiveChatMatchId] = useState<string | undefined>()
   const [isAdminMode, setIsAdminMode] = useState(false)
@@ -48,6 +49,20 @@ function AppContent() {
   // Show authentication screen if not logged in
   if (!isAuthenticated) {
     return <AuthScreen />
+  }
+
+  // If user is logged in but profile not completed, show profile completion
+  if (user && user.isAuthenticated && !user.profileCompleted) {
+    return (
+      <ProfileCompletion
+        userEmail={user.email}
+        userName={user.name}
+        onComplete={() => {
+          // Profile completion will handle authentication
+          // No additional action needed here
+        }}
+      />
+    )
   }
 
   // Show welcome screen for new users

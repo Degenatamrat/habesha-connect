@@ -7,11 +7,14 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "./AuthContext"
 import { toast } from "sonner"
+import ProfileCompletion from "@/components/onboarding/ProfileCompletion"
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showProfileCompletion, setShowProfileCompletion] = useState(false)
+  const [pendingUser, setPendingUser] = useState<{ email: string; name: string } | null>(null)
   
   // Sign In form
   const [signInEmail, setSignInEmail] = useState("")
@@ -61,9 +64,13 @@ export default function AuthScreen() {
 
     setIsLoading(true)
     try {
-      const success = await signUp(signUpEmail, signUpPassword, signUpName)
-      if (success) {
-        toast.success("Account created successfully! Welcome to Habesha!")
+      const result = await signUp(signUpEmail, signUpPassword, signUpName)
+      if (result.success) {
+        if (result.needsProfileCompletion) {
+          setPendingUser({ email: signUpEmail, name: signUpName })
+          setShowProfileCompletion(true)
+          toast.success("Account created! Let's complete your profile.")
+        }
       } else {
         toast.error("An account with this email already exists")
       }
@@ -72,6 +79,23 @@ export default function AuthScreen() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleProfileCompletion = () => {
+    setShowProfileCompletion(false)
+    setPendingUser(null)
+    // The user is now authenticated via the finalizeAccount call
+  }
+
+  // Show profile completion screen if needed
+  if (showProfileCompletion && pendingUser) {
+    return (
+      <ProfileCompletion
+        userEmail={pendingUser.email}
+        userName={pendingUser.name}
+        onComplete={handleProfileCompletion}
+      />
+    )
   }
 
   return (
