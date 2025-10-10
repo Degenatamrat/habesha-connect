@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react"
-import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Check, X, Trash } from "@phosphor-icons/react"
+import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Check, X, Trash, User } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useKV } from "@github/spark/hooks"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -96,6 +97,7 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const isMobile = useIsMobile()
 
   const activeChat = chats?.find(chat => chat.matchId === activeMatchId)
 
@@ -238,14 +240,26 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
 
   const handleRecordingStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
-    startRecording()
+    if (!isMobile) {
+      // Desktop: Click to start/stop recording
+      if (isRecording) {
+        stopRecording()
+      } else {
+        startRecording()
+      }
+    } else {
+      // Mobile: Hold to record
+      startRecording()
+    }
   }
 
   const handleRecordingEnd = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
-    if (isRecording) {
+    if (isMobile && isRecording) {
+      // Mobile: Release to send
       stopRecording()
     }
+    // Desktop: Do nothing on mouse up since we handle click to start/stop
   }
 
   const sendRecordedMessage = () => {
@@ -281,6 +295,13 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
     setRecordedAudioUrl(null)
     setShowRecordingControls(false)
     setRecordingTime(0)
+  }
+
+  const handleProfileClick = (matchId: string) => {
+    // Navigate to the profile or start a new chat with this person
+    if (onStartChat) {
+      onStartChat(matchId)
+    }
   }
 
   // Clean up on unmount
@@ -337,16 +358,26 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
               {userChats.map((chat) => {
                 const lastMessage = chat.messages[chat.messages.length - 1]
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform"
-                        onClick={() => onStartChat?.(chat.matchId)}>
-                    <CardContent className="p-3">
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform">
+                    <CardContent className="p-3" onClick={() => onStartChat?.(chat.matchId)}>
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <img 
-                            src={chat.matchPhoto} 
-                            alt={chat.matchName}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
+                          <div 
+                            className="cursor-pointer group"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleProfileClick(chat.matchId)
+                            }}
+                          >
+                            <img 
+                              src={chat.matchPhoto} 
+                              alt={chat.matchName}
+                              className="w-12 h-12 rounded-full object-cover group-hover:ring-2 group-hover:ring-primary/50 transition-all"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-full transition-colors flex items-center justify-center">
+                              <User className="w-3 h-3 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+                            </div>
+                          </div>
                           {chat.lastActive === "Online" && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
                           )}
@@ -393,11 +424,19 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
-          <img 
-            src={activeChat.matchPhoto} 
-            alt={activeChat.matchName}
-            className="w-9 h-9 rounded-full object-cover"
-          />
+          <div 
+            className="relative cursor-pointer group"
+            onClick={() => handleProfileClick(activeChat.matchId)}
+          >
+            <img 
+              src={activeChat.matchPhoto} 
+              alt={activeChat.matchName}
+              className="w-9 h-9 rounded-full object-cover group-hover:ring-2 group-hover:ring-primary/50 transition-all"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-full transition-colors flex items-center justify-center">
+              <User className="w-4 h-4 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+            </div>
+          </div>
           
           <div className="flex-1 min-w-0">
             <h2 className="font-semibold text-sm truncate">{activeChat.matchName}</h2>
@@ -530,7 +569,9 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
                 />
               </div>
             </div>
-            <span className="text-xs text-muted-foreground">Release to send</span>
+            <span className="text-xs text-muted-foreground">
+              {isMobile ? "Release to send" : "Click mic to stop"}
+            </span>
           </div>
         )}
         
@@ -571,14 +612,19 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
             {/* Voice recording button - show when no text and no recording controls */}
             {!newMessage.trim() && !showRecordingControls && (
               <Button 
-                onMouseDown={handleRecordingStart}
-                onMouseUp={handleRecordingEnd}
-                onMouseLeave={handleRecordingEnd}
-                onTouchStart={handleRecordingStart}
-                onTouchEnd={handleRecordingEnd}
+                onMouseDown={isMobile ? handleRecordingStart : undefined}
+                onMouseUp={isMobile ? handleRecordingEnd : undefined}
+                onMouseLeave={isMobile ? handleRecordingEnd : undefined}
+                onTouchStart={isMobile ? handleRecordingStart : undefined}
+                onTouchEnd={isMobile ? handleRecordingEnd : undefined}
+                onClick={!isMobile ? handleRecordingStart : undefined}
                 variant="ghost"
                 size="sm"
-                className="p-2 flex-shrink-0 rounded-full w-10 h-10 select-none"
+                className={cn(
+                  "p-2 flex-shrink-0 rounded-full w-10 h-10 select-none",
+                  isRecording && "bg-destructive/20 text-destructive"
+                )}
+                title={isMobile ? "Hold to record voice message" : isRecording ? "Click to stop recording" : "Click to start recording"}
               >
                 <Microphone className="w-5 h-5" />
               </Button>
