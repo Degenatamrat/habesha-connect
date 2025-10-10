@@ -106,7 +106,7 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
   const canProceed = () => {
     switch (currentStep) {
       case 0: return profileData.photo !== ""
-      case 1: return profileData.bio.trim().length >= 10
+      case 1: return true // Bio is now optional
       case 2: return profileData.interests.length >= 3
       case 3: return profileData.languages.length >= 1
       case 4: return profileData.phoneNumber.trim().length >= 10
@@ -118,7 +118,7 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
     if (!canProceed()) {
       const requirements = [
         "Please add a photo",
-        "Please write at least 10 characters about yourself",
+        "", // Bio is optional, no error message needed
         "Please select at least 3 interests",
         "Please select at least 1 language",
         "Please enter a valid phone number"
@@ -205,7 +205,7 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="bio" className="text-base">Tell us about yourself</Label>
+              <Label htmlFor="bio" className="text-base">Tell us about yourself (optional)</Label>
               <p className="text-sm text-muted-foreground mb-3">
                 Share your passions, what makes you unique, and what you're looking for.
               </p>
