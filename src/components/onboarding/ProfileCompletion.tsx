@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { Camera, Heart, Plus, X, ArrowLeft, ArrowRight, Check } from "@phosphor-icons/react"
+import { Camera, Heart, Plus, X, ArrowLeft, ArrowRight, Check, MapPin, Calendar, User } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
+import { Slider } from "@/components/ui/slider"
 import { useKV } from "@github/spark/hooks"
 import { useAuth } from "@/components/auth/AuthContext"
 import { toast } from "sonner"
@@ -18,6 +19,10 @@ interface ProfileData {
   interests: string[]
   languages: string[]
   phoneNumber: string
+  age: number
+  location: string
+  religion: string
+  ageRangePreference: [number, number]
 }
 
 interface ProfileCompletionProps {
@@ -37,6 +42,21 @@ const COMMON_LANGUAGES = [
   "German", "Spanish", "Oromo", "Somali", "Afar", "Sidamo"
 ]
 
+const RELIGION_OPTIONS = [
+  "Orthodox", "Catholic", "Protestant", "Muslim", "Non-religious"
+]
+
+const LOCATION_OPTIONS = [
+  "Dubai, UAE",
+  "Riyadh, Saudi Arabia", 
+  "Kuwait City, Kuwait",
+  "Doha, Qatar",
+  "Abu Dhabi, UAE",
+  "Jeddah, Saudi Arabia",
+  "Manama, Bahrain",
+  "Muscat, Oman"
+]
+
 export default function ProfileCompletion({ userEmail, userName, onComplete }: ProfileCompletionProps) {
   const { finalizeAccount } = useAuth()
   const [currentStep, setCurrentStep] = useState(0)
@@ -48,14 +68,21 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
     bio: "",
     interests: [],
     languages: [],
-    phoneNumber: ""
+    phoneNumber: "",
+    age: 25,
+    location: "Dubai, UAE",
+    religion: "Orthodox",
+    ageRangePreference: [22, 35]
   })
 
   const steps = [
     { title: "Add Your Photo", description: "Let people see the real you" },
+    { title: "About You", description: "Your age and location" },
     { title: "Tell Your Story", description: "Share what makes you unique" },
     { title: "Your Interests", description: "What do you love doing?" },
     { title: "Languages", description: "What languages do you speak?" },
+    { title: "Faith & Values", description: "Your religious background" },
+    { title: "Dating Preferences", description: "Age range you're looking for" },
     { title: "Contact Info", description: "Add your phone number" }
   ]
 
@@ -106,10 +133,13 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
   const canProceed = () => {
     switch (currentStep) {
       case 0: return profileData.photo !== ""
-      case 1: return true // Bio is now optional
-      case 2: return profileData.interests.length >= 3
-      case 3: return profileData.languages.length >= 1
-      case 4: return profileData.phoneNumber.trim().length >= 10
+      case 1: return profileData.age >= 18 && profileData.location !== ""
+      case 2: return true // Bio is now optional
+      case 3: return profileData.interests.length >= 3
+      case 4: return profileData.languages.length >= 1
+      case 5: return profileData.religion !== ""
+      case 6: return true // Age preference has default values
+      case 7: return profileData.phoneNumber.trim().length >= 10
       default: return false
     }
   }
@@ -118,12 +148,17 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
     if (!canProceed()) {
       const requirements = [
         "Please add a photo",
+        "Please enter your age and select location",
         "", // Bio is optional, no error message needed
         "Please select at least 3 interests",
         "Please select at least 1 language",
+        "Please select your religion",
+        "", // Age preference has defaults
         "Please enter a valid phone number"
       ]
-      toast.error(requirements[currentStep])
+      if (requirements[currentStep]) {
+        toast.error(requirements[currentStep])
+      }
       return
     }
 
@@ -203,6 +238,57 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
 
       case 1:
         return (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="age" className="text-base flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Your Age
+                </Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  This helps us find age-appropriate matches
+                </p>
+                <Input
+                  id="age"
+                  type="number"
+                  value={profileData.age}
+                  onChange={(e) => setProfileData(prev => ({ ...prev, age: parseInt(e.target.value) || 18 }))}
+                  min="18"
+                  max="80"
+                  className="text-base"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location" className="text-base flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Your Location
+                </Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  We'll show you people nearby
+                </p>
+                <Select
+                  value={profileData.location}
+                  onValueChange={(value) => setProfileData(prev => ({ ...prev, location: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOCATION_OPTIONS.map((location) => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 2:
+        return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="bio" className="text-base">Tell us about yourself (optional)</Label>
@@ -224,7 +310,7 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
           </div>
         )
 
-      case 2:
+      case 3:
         return (
           <div className="space-y-4">
             <div>
@@ -271,7 +357,7 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
           </div>
         )
 
-      case 3:
+      case 4:
         return (
           <div className="space-y-4">
             <div>
@@ -318,7 +404,65 @@ export default function ProfileCompletion({ userEmail, userName, onComplete }: P
           </div>
         )
 
-      case 4:
+      case 5:
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base">Religious Background</Label>
+              <p className="text-sm text-muted-foreground mb-4">
+                This helps us find people who share similar values
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              {RELIGION_OPTIONS.map((religion) => (
+                <Button
+                  key={religion}
+                  variant={profileData.religion === religion ? "default" : "outline"}
+                  onClick={() => setProfileData(prev => ({ ...prev, religion }))}
+                  className="w-full justify-start h-auto py-4 text-left"
+                >
+                  {religion}
+                  {profileData.religion === religion && (
+                    <Check className="w-4 h-4 ml-auto" />
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )
+
+      case 6:
+        return (
+          <div className="space-y-6">
+            <div>
+              <Label className="text-base flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Age Range You're Looking For
+              </Label>
+              <p className="text-sm text-muted-foreground mb-4">
+                {profileData.ageRangePreference[0]} - {profileData.ageRangePreference[1]} years old
+              </p>
+            </div>
+            
+            <Slider
+              value={profileData.ageRangePreference}
+              onValueChange={(value) => setProfileData(prev => ({ ...prev, ageRangePreference: value as [number, number] }))}
+              max={60}
+              min={18}
+              step={1}
+              className="w-full"
+            />
+            
+            <div className="bg-muted rounded-lg p-4">
+              <p className="text-sm text-muted-foreground">
+                💡 <strong>Tip:</strong> You can always adjust these preferences later in your discovery filters.
+              </p>
+            </div>
+          </div>
+        )
+
+      case 7:
         return (
           <div className="space-y-4">
             <div>

@@ -15,6 +15,10 @@ interface ProfileData {
   interests: string[]
   languages: string[]
   phoneNumber: string
+  age: number
+  location: string
+  religion: string
+  ageRangePreference: [number, number]
 }
 
 interface AuthContextType {
@@ -88,15 +92,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Save the complete profile data
     await window.spark.kv.set("user-profile", {
       name,
-      age: 25, // Default age, can be updated later
-      location: "Dubai, UAE", // Default location
+      age: profileData.age,
+      location: profileData.location,
       bio: profileData.bio,
       interests: profileData.interests,
       photos: profileData.photo ? [profileData.photo] : [],
-      religion: "Orthodox", // Default
+      religion: profileData.religion,
       languages: profileData.languages,
       profession: "Professional", // Default
       phoneNumber: profileData.phoneNumber
+    })
+
+    // Save user's discovery preferences based on their sign-up choices
+    await window.spark.kv.set("user-discovery-preferences", {
+      ageRange: profileData.ageRangePreference,
+      location: profileData.location,
+      interests: profileData.interests,
+      religion: [profileData.religion]
     })
 
     // Now authenticate the user

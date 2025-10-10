@@ -64,8 +64,16 @@ export default function DiscoverPage() {
   const [matches, setMatches] = useKV<string[]>("user-matches", [])
   const [passes, setPasses] = useKV<string[]>("user-passes", [])
   const [filteredProfiles, setFilteredProfiles] = useState<UserProfile[]>(sampleProfiles)
+  const [userPreferences, setUserPreferences] = useKV<FilterOptions | null>("user-discovery-preferences", null)
   
   const currentProfile = filteredProfiles[currentProfileIndex]
+
+  // Load user preferences and apply them as initial filters
+  useEffect(() => {
+    if (userPreferences) {
+      handleFiltersChange(userPreferences)
+    }
+  }, [userPreferences])
   
   const handleFiltersChange = (filters: FilterOptions) => {
     // Apply filters to profiles
@@ -129,7 +137,7 @@ export default function DiscoverPage() {
     
     return (
       <div className="h-full flex flex-col">
-        <FilterBar onFiltersChange={handleFiltersChange} />
+        <FilterBar onFiltersChange={handleFiltersChange} initialPreferences={userPreferences} />
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-[280px] sm:w-[300px] md:w-[320px] text-center">
             <CardContent className="p-6">
@@ -160,7 +168,7 @@ export default function DiscoverPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Fixed Filter Bar */}
-      <FilterBar onFiltersChange={handleFiltersChange} />
+      <FilterBar onFiltersChange={handleFiltersChange} initialPreferences={userPreferences} />
       
       {/* Swipeable Cards Area */}
       <div className="flex-1 flex flex-col p-3 md:p-6">

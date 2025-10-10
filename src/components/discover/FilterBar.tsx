@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SlidersHorizontal, MapPin, Calendar, Heart } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +23,7 @@ interface FilterOptions {
 
 interface FilterBarProps {
   onFiltersChange: (filters: FilterOptions) => void
+  initialPreferences?: FilterOptions | null
 }
 
 const interestOptions = [
@@ -47,20 +48,45 @@ const locationOptions = [
   "Muscat, Oman"
 ]
 
-export default function FilterBar({ onFiltersChange }: FilterBarProps) {
-  const [filters, setFilters] = useState<FilterOptions>({
-    ageRange: [18, 50],
-    location: "All Locations",
-    interests: [],
-    religion: []
+export default function FilterBar({ onFiltersChange, initialPreferences }: FilterBarProps) {
+  const [filters, setFilters] = useState<FilterOptions>(() => {
+    // Use initial preferences if available, otherwise use defaults
+    return initialPreferences || {
+      ageRange: [18, 50],
+      location: "All Locations",
+      interests: [],
+      religion: []
+    }
   })
 
   const [activeFiltersCount, setActiveFiltersCount] = useState(0)
+
+  // Update filters when initial preferences change
+  useEffect(() => {
+    if (initialPreferences && initialPreferences !== filters) {
+      setFilters(initialPreferences)
+      onFiltersChange(initialPreferences)
+      
+      // Count active filters for the new preferences
+      let count = 0
+      if (initialPreferences.location !== "All Locations") count++
+      if (initialPreferences.interests.length > 0) count++
+      if (initialPreferences.religion.length > 0) count++
+      if (initialPreferences.ageRange[0] !== 18 || initialPreferences.ageRange[1] !== 50) count++
+      
+      setActiveFiltersCount(count)
+    }
+  }, [initialPreferences])
 
   const updateFilters = (newFilters: Partial<FilterOptions>) => {
     const updatedFilters = { ...filters, ...newFilters }
     setFilters(updatedFilters)
     onFiltersChange(updatedFilters)
+    
+    // Save updated preferences
+    if (typeof window !== 'undefined' && window.spark?.kv) {
+      window.spark.kv.set("user-discovery-preferences", updatedFilters)
+    }
     
     // Count active filters
     let count = 0
@@ -82,6 +108,11 @@ export default function FilterBar({ onFiltersChange }: FilterBarProps) {
     setFilters(defaultFilters)
     onFiltersChange(defaultFilters)
     setActiveFiltersCount(0)
+    
+    // Clear saved preferences
+    if (typeof window !== 'undefined' && window.spark?.kv) {
+      window.spark.kv.set("user-discovery-preferences", defaultFilters)
+    }
   }
 
   const toggleArrayFilter = (category: keyof Pick<FilterOptions, 'interests' | 'religion'>, value: string) => {
