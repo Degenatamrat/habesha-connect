@@ -81,6 +81,7 @@ function AppContent() {
           <MessagesPage 
             activeMatchId={activeChatMatchId}
             onBackToMatches={handleBackToMatches}
+            onStartChat={handleStartChat}
           />
         )
       case "profile":

@@ -79,9 +79,10 @@ const sampleChats: Chat[] = [
 interface MessagesPageProps {
   activeMatchId?: string
   onBackToMatches?: () => void
+  onStartChat?: (matchId: string) => void
 }
 
-export default function MessagesPage({ activeMatchId, onBackToMatches }: MessagesPageProps) {
+export default function MessagesPage({ activeMatchId, onBackToMatches, onStartChat }: MessagesPageProps) {
   const [chats, setChats] = useKV<Chat[]>("user-chats", sampleChats)
   const [newMessage, setNewMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
@@ -336,7 +337,8 @@ export default function MessagesPage({ activeMatchId, onBackToMatches }: Message
               {userChats.map((chat) => {
                 const lastMessage = chat.messages[chat.messages.length - 1]
                 return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform">
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform"
+                        onClick={() => onStartChat?.(chat.matchId)}>
                     <CardContent className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="relative">
