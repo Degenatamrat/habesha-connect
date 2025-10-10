@@ -13,11 +13,11 @@ import { useKV } from "@github/spark/hooks"
 import { Toaster } from "@/components/ui/sonner"
 
 function AppContent() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState("discover")
   const [activeChatMatchId, setActiveChatMatchId] = useState<string | undefined>()
   const [isAdminMode, setIsAdminMode] = useState(false)
-  const [hasSeenWelcome, setHasSeenWelcome] = useKV<boolean>("has-seen-welcome", false)
+  const [hasSeenWelcome, setHasSeenWelcome] = useKV<boolean>(`has-seen-welcome-${user?.id || 'guest'}`, false)
 
   useEffect(() => {
     // Check if the current path is /admin
@@ -29,6 +29,8 @@ function AppContent() {
 
   const handleGetStarted = () => {
     setHasSeenWelcome(true)
+    // Clear the new user flag
+    updateUser({ isNewUser: false })
   }
 
   const handleStartChat = (matchId: string) => {
@@ -65,8 +67,8 @@ function AppContent() {
     )
   }
 
-  // Show welcome screen for new users
-  if (!hasSeenWelcome) {
+  // Show welcome screen only for new users who just completed their profile
+  if (user?.isNewUser && !hasSeenWelcome) {
     return <WelcomeScreen onGetStarted={handleGetStarted} />
   }
 

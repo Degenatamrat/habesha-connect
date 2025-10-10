@@ -7,6 +7,7 @@ interface User {
   name: string
   isAuthenticated: boolean
   profileCompleted: boolean
+  isNewUser?: boolean
 }
 
 interface ProfileData {
@@ -28,6 +29,7 @@ interface AuthContextType {
   signOut: () => void
   deleteAccount: () => Promise<void>
   finalizeAccount: (email: string, name: string, profileData: ProfileData) => Promise<void>
+  updateUser: (updates: Partial<User>) => void
   isAuthenticated: boolean
 }
 
@@ -39,19 +41,32 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useKV<User | null>("current-user", null)
-  const [registeredUsers, setRegisteredUsers] = useKV<Record<string, { email: string, password: string, name: string, profileCompleted?: boolean }>>("registered-users", {})
+  const [registeredUsers, setRegisteredUsers] = useKV<Record<string, { email: string, password: string, name: string, profileCompleted?: boolean }>>("registered-users", {
+    // Add a test user for development
+    "test@example.com": {
+      email: "test@example.com",
+      password: "password123",
+      name: "Test User",
+      profileCompleted: true
+    }
+  })
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     // Check if user exists in our mock database
     const userRecord = Object.values(registeredUsers || {}).find(u => u.email === email && u.password === password)
     
     if (userRecord) {
+      // For existing users, check if they have profile completion status set
+      // If undefined, assume profile is completed (backward compatibility)
+      const profileCompleted = userRecord.profileCompleted !== false
+      
       const authenticatedUser: User = {
         id: email, // Using email as ID for simplicity
         email: userRecord.email,
         name: userRecord.name,
         isAuthenticated: true,
-        profileCompleted: userRecord.profileCompleted || false
+        profileCompleted,
+        isNewUser: false // Existing user signing in
       }
       setUser(authenticatedUser)
       return true
@@ -111,13 +126,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       religion: [profileData.religion]
     })
 
-    // Now authenticate the user
+    // Now authenticate the user as a new user
     const authenticatedUser: User = {
       id: email,
       email,
       name,
       isAuthenticated: true,
-      profileCompleted: true
+      profileCompleted: true,
+      isNewUser: true // New user who just completed profile
     }
     setUser(authenticatedUser)
   }
@@ -143,6 +159,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...updates })
+    }
+  }
+
   return (
     <AuthContext.Provider value={{
       user: user || null,
@@ -151,7 +173,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signOut,
       deleteAccount,
       finalizeAccount,
-      isAuthenticated: !!(user?.isAuthenticated && user?.profileCompleted)
+      updateUser,
+      isAuthenticated: !!(user?.isAuthenticated)
     }}>
       {children}
     </AuthContext.Provider>
