@@ -40,12 +40,12 @@ A modern dating platform connecting Ethiopians and Eritreans living in Arab coun
 - Progression: Language selection → Localized interface → Cultural content → Enhanced engagement
 - Success criteria: Users comfortably navigate in their preferred language
 
-**Admin Moderation System**
-- Functionality: Hidden dashboard for content moderation and user management
-- Purpose: Maintain safe, authentic community environment
-- Trigger: Admin login at /admin endpoint  
-- Progression: Admin auth → Dashboard → User management → Content review → Analytics
-- Success criteria: Effective content moderation and community safety maintenance
+**Admin Dashboard System**
+- Functionality: Comprehensive admin dashboard for complete platform management including user management, content moderation, analytics, profile approvals, system settings, and activity logging
+- Purpose: Maintain safe, authentic community environment with full administrative control
+- Trigger: Admin login at /admin endpoint with role-based authentication
+- Progression: Admin auth → Overview dashboard → User management → Content moderation → Analytics → Settings → Audit logs
+- Success criteria: Complete admin control over platform with secure access, comprehensive monitoring, and effective community management
 
 ## Edge Case Handling
 
