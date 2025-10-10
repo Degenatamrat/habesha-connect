@@ -1,14 +1,16 @@
 import { useState, useRef } from "react"
-import { Camera, MapPin, Calendar, Heart, Gear, SignOut, Plus, X, Pencil, Check } from "@phosphor-icons/react"
+import { Camera, MapPin, Calendar, Heart, Gear, SignOut, Plus, X, Pencil, Check, Trash } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useKV } from "@github/spark/hooks"
+import { useAuth } from "@/components/auth/AuthContext"
 import { toast } from "sonner"
 
 interface UserProfile {
@@ -36,11 +38,13 @@ const defaultProfile: UserProfile = {
 }
 
 export default function ProfilePage() {
+  const { signOut, deleteAccount, user } = useAuth()
   const [profile, setProfile] = useKV<UserProfile>("user-profile", defaultProfile)
   const [editMode, setEditMode] = useState(false)
   const [editData, setEditData] = useState<UserProfile>(defaultProfile)
   const [showAccountSettings, setShowAccountSettings] = useState(false)
   const [newInterest, setNewInterest] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!profile) return null
@@ -144,6 +148,23 @@ export default function ProfilePage() {
   }
 
   const displayProfile = editMode ? editData : profile
+
+  const handleSignOut = () => {
+    signOut()
+    toast.success("Signed out successfully!")
+  }
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true)
+    try {
+      await deleteAccount()
+      toast.success("Account deleted successfully")
+    } catch (error) {
+      toast.error("Failed to delete account. Please try again.")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="h-full overflow-auto">
@@ -401,7 +422,8 @@ export default function ProfilePage() {
                       id="email" 
                       type="email" 
                       placeholder="your.email@example.com"
-                      defaultValue="user@habesha.app"
+                      defaultValue={user?.email || "user@habesha.app"}
+                      disabled
                     />
                   </div>
                   <div className="space-y-2">
@@ -439,6 +461,38 @@ export default function ProfilePage() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium text-destructive mb-3">Danger Zone</h4>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="w-full">
+                          <Trash className="w-4 h-4 mr-2" />
+                          Delete Account Permanently
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete your account? This action cannot be undone. 
+                            All your matches, messages, and profile data will be permanently removed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleDeleteAccount}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? "Deleting..." : "Delete Account"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+
                   <Button 
                     className="w-full" 
                     onClick={() => {
@@ -459,10 +513,7 @@ export default function ProfilePage() {
             <Button 
               variant="ghost" 
               className="w-full justify-start text-destructive h-10 text-sm"
-              onClick={() => {
-                toast.success("Signed out successfully!")
-                // In a real app, this would handle authentication
-              }}
+              onClick={handleSignOut}
             >
               <SignOut className="w-4 h-4 mr-3" />
               Sign Out
