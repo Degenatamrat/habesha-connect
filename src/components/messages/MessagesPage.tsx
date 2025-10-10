@@ -91,12 +91,15 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
   const [showRecordingControls, setShowRecordingControls] = useState(false)
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [isCancelled, setIsCancelled] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const recordButtonRef = useRef<HTMLButtonElement>(null)
+  const initialTouchPos = useRef<{ x: number; y: number } | null>(null)
   const isMobile = useIsMobile()
 
   const activeChat = chats?.find(chat => chat.matchId === activeMatchId)
@@ -200,9 +203,21 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
         const audioUrl = URL.createObjectURL(audioBlob)
         
-        setRecordedAudioBlob(audioBlob)
-        setRecordedAudioUrl(audioUrl)
-        setShowRecordingControls(true)
+        if (!isCancelled) {
+          if (isMobile) {
+            // Mobile: Auto-send on release (WhatsApp style)
+            sendRecordedMessageDirectly(audioBlob, audioUrl)
+          } else {
+            // Desktop: Show controls to confirm send
+            setRecordedAudioBlob(audioBlob)
+            setRecordedAudioUrl(audioUrl)
+            setShowRecordingControls(true)
+          }
+        } else {
+          // Clean up if cancelled
+          URL.revokeObjectURL(audioUrl)
+          setIsCancelled(false)
+        }
       }
       
       mediaRecorder.start(100) // Collect data every 100ms
@@ -240,26 +255,65 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
 
   const handleRecordingStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
-    if (!isMobile) {
+    
+    if (isMobile) {
+      // Mobile: Touch start to record
+      if ('touches' in e) {
+        initialTouchPos.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        }
+      }
+      if (!isRecording) {
+        startRecording()
+      }
+    } else {
       // Desktop: Click to start/stop recording
       if (isRecording) {
         stopRecording()
       } else {
         startRecording()
       }
-    } else {
-      // Mobile: Hold to record
-      startRecording()
     }
   }
 
   const handleRecordingEnd = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
+    
     if (isMobile && isRecording) {
-      // Mobile: Release to send
+      // Mobile: Check if user slid away to cancel
+      let shouldCancel = false
+      
+      if ('changedTouches' in e && initialTouchPos.current) {
+        const touch = e.changedTouches[0]
+        const deltaY = Math.abs(touch.clientY - initialTouchPos.current.y)
+        const deltaX = Math.abs(touch.clientX - initialTouchPos.current.x)
+        
+        // Cancel if user slid more than 50px away
+        shouldCancel = deltaY > 50 || deltaX > 50
+      }
+      
+      if (shouldCancel) {
+        setIsCancelled(true)
+        toast("Recording cancelled", { description: "Slide up to cancel" })
+      }
+      
       stopRecording()
+      initialTouchPos.current = null
     }
-    // Desktop: Do nothing on mouse up since we handle click to start/stop
+  }
+
+  const handleRecordingMove = (e: React.TouchEvent) => {
+    if (isMobile && isRecording && initialTouchPos.current) {
+      const touch = e.touches[0]
+      const deltaY = touch.clientY - initialTouchPos.current.y
+      const deltaX = Math.abs(touch.clientX - initialTouchPos.current.x)
+      
+      // Visual feedback for cancel gesture
+      if (deltaY < -30 || deltaX > 30) {
+        // User is sliding to cancel - could add visual feedback here
+      }
+    }
   }
 
   const sendRecordedMessage = () => {
@@ -285,6 +339,38 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
     
     toast.success("Voice message sent!")
     cancelRecording()
+  }
+
+  const sendRecordedMessageDirectly = (audioBlob: Blob, audioUrl: string) => {
+    if (!activeChat || recordingTime === 0) return
+
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: "me",
+      text: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'audio',
+      audioUrl: audioUrl,
+      audioDuration: recordingTime
+    }
+
+    setChats(currentChats => 
+      (currentChats || []).map(chat => 
+        chat.id === activeChat.id 
+          ? { ...chat, messages: [...chat.messages, message] }
+          : chat
+      )
+    )
+    
+    toast.success("Voice message sent!")
+    
+    // Clean up
+    setRecordingTime(0)
+    setIsRecording(false)
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+      recordingIntervalRef.current = null
+    }
   }
 
   const cancelRecording = () => {
@@ -556,9 +642,9 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
         
         {/* Recording Indicator - Show while recording */}
         {isRecording && (
-          <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-2xl mb-2">
-            <div className="flex items-center gap-2 flex-1">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+          <div className="flex items-center gap-3 p-4 bg-destructive/10 rounded-2xl mb-2 border border-destructive/20">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
               <span className="text-sm text-destructive font-medium">
                 Recording: {formatTime(recordingTime)}
               </span>
@@ -569,9 +655,16 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
                 />
               </div>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {isMobile ? "Release to send" : "Click mic to stop"}
-            </span>
+            <div className="text-center">
+              <span className="text-xs text-destructive font-medium block">
+                {isMobile ? "Release to send" : "Click mic to stop"}
+              </span>
+              {isMobile && (
+                <span className="text-xs text-muted-foreground block mt-1">
+                  Slide away to cancel
+                </span>
+              )}
+            </div>
           </div>
         )}
         
@@ -597,8 +690,8 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
               />
             </div>
             
-            {/* Send button for text messages - always show when there's text */}
-            {newMessage.trim() && (
+            {/* Send button appears when there's text */}
+            {newMessage.trim() ? (
               <Button 
                 onClick={sendMessage}
                 variant="default"
@@ -607,27 +700,29 @@ export default function MessagesPage({ activeMatchId, onBackToMatches, onStartCh
               >
                 <PaperPlaneRight className="w-4 h-4" />
               </Button>
-            )}
-            
-            {/* Voice recording button - show when no text and no recording controls */}
-            {!newMessage.trim() && !showRecordingControls && (
-              <Button 
-                onMouseDown={isMobile ? handleRecordingStart : undefined}
-                onMouseUp={isMobile ? handleRecordingEnd : undefined}
-                onMouseLeave={isMobile ? handleRecordingEnd : undefined}
-                onTouchStart={isMobile ? handleRecordingStart : undefined}
-                onTouchEnd={isMobile ? handleRecordingEnd : undefined}
-                onClick={!isMobile ? handleRecordingStart : undefined}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "p-2 flex-shrink-0 rounded-full w-10 h-10 select-none",
-                  isRecording && "bg-destructive/20 text-destructive"
-                )}
-                title={isMobile ? "Hold to record voice message" : isRecording ? "Click to stop recording" : "Click to start recording"}
-              >
-                <Microphone className="w-5 h-5" />
-              </Button>
+            ) : (
+              /* Voice recording button shows when no text and no recording controls */
+              !showRecordingControls && (
+                <Button 
+                  ref={recordButtonRef}
+                  onMouseDown={!isMobile ? handleRecordingStart : undefined}
+                  onMouseUp={!isMobile ? undefined : undefined}
+                  onMouseLeave={isMobile ? handleRecordingEnd : undefined}
+                  onTouchStart={isMobile ? handleRecordingStart : undefined}
+                  onTouchEnd={isMobile ? handleRecordingEnd : undefined}
+                  onTouchMove={isMobile ? handleRecordingMove : undefined}
+                  onClick={!isMobile ? handleRecordingStart : undefined}
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "p-2 flex-shrink-0 rounded-full w-10 h-10 select-none",
+                    isRecording && "bg-destructive/20 text-destructive scale-110 transition-transform"
+                  )}
+                  title={isMobile ? "Hold to record voice message" : isRecording ? "Click to stop recording" : "Click to start recording"}
+                >
+                  <Microphone className="w-5 h-5" />
+                </Button>
+              )
             )}
           </div>
         )}
