@@ -22,4 +22,7 @@ export default defineConfig({
       '@': resolve(projectRoot, 'src')
     }
   },
+  preview: {
+    allowedHosts: ['habesha-90nw.onrender.com'],
+  },
 });
