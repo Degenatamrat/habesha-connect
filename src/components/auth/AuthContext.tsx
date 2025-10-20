@@ -1,190 +1,142 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { useKV } from '@github/spark/hooks'
+import React, { createContext, useContext, ReactNode, useState } from "react";
 
 interface User {
-  id: string
-  email: string
-  name: string
-  isAuthenticated: boolean
-  profileCompleted: boolean
-  isNewUser?: boolean
+  id: string;
+  email: string;
+  name: string;
+  isAuthenticated: boolean;
+  profileCompleted: boolean;
+  isNewUser?: boolean;
 }
 
 interface ProfileData {
-  photo: string
-  bio: string
-  interests: string[]
-  languages: string[]
-  phoneNumber: string
-  age: number
-  location: string
-  religion: string
-  ageRangePreference: [number, number]
+  photo: string;
+  bio: string;
+  interests: string[];
+  languages: string[];
+  phoneNumber: string;
+  age: number;
+  location: string;
+  religion: string;
+  ageRangePreference: [number, number];
 }
 
 interface AuthContextType {
-  user: User | null
-  signIn: (email: string, password: string) => Promise<boolean>
-  signUp: (email: string, password: string, name: string) => Promise<{ success: boolean; needsProfileCompletion?: boolean }>
-  signOut: () => void
-  deleteAccount: () => Promise<void>
-  finalizeAccount: (email: string, name: string, profileData: ProfileData) => Promise<void>
-  updateUser: (updates: Partial<User>) => void
-  isAuthenticated: boolean
+  user: User | null;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (
+    email: string,
+    password: string,
+    name: string
+  ) => Promise<{ success: boolean; needsProfileCompletion?: boolean }>;
+  signOut: () => void;
+  finalizeAccount: (email: string, name: string, profileData: ProfileData) => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
+  isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useKV<User | null>("current-user", null)
-  const [registeredUsers, setRegisteredUsers] = useKV<Record<string, { email: string, password: string, name: string, profileCompleted?: boolean }>>("registered-users", {
-    // Add a test user for development
-    "test@example.com": {
-      email: "test@example.com",
-      password: "password123",
-      name: "Test User",
-      profileCompleted: true
-    }
-  })
+  const [user, setUser] = useState<User | null>(null);
 
+  // ✅ Updated to use your local backend
+  const BASE_URL = "http://localhost:4000";
+
+  // ==== SIGN IN ====
   const signIn = async (email: string, password: string): Promise<boolean> => {
-    // Check if user exists in our mock database
-    const userRecord = Object.values(registeredUsers || {}).find(u => u.email === email && u.password === password)
-    
-    if (userRecord) {
-      // For existing users, check if they have profile completion status set
-      // If undefined, assume profile is completed (backward compatibility)
-      const profileCompleted = userRecord.profileCompleted !== false
-      
-      const authenticatedUser: User = {
-        id: email, // Using email as ID for simplicity
-        email: userRecord.email,
-        name: userRecord.name,
-        isAuthenticated: true,
-        profileCompleted,
-        isNewUser: false // Existing user signing in
+    try {
+      const response = await fetch(`${BASE_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const authenticatedUser: User = {
+          id: email,
+          email: data.user.email,
+          name: data.user.name,
+          isAuthenticated: true,
+          profileCompleted: true,
+          isNewUser: false,
+        };
+        setUser(authenticatedUser);
+        return true;
+      } else {
+        console.error("Login failed:", data.message);
+        return false;
       }
-      setUser(authenticatedUser)
-      return true
+    } catch (error) {
+      console.error("Error logging in:", error);
+      return false;
     }
-    return false
-  }
+  };
 
-  const signUp = async (email: string, password: string, name: string): Promise<{ success: boolean; needsProfileCompletion?: boolean }> => {
-    // Check if user already exists
-    if (Object.values(registeredUsers || {}).some(u => u.email === email)) {
-      return { success: false }
-    }
+  // ==== SIGN UP ====
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string
+  ): Promise<{ success: boolean; needsProfileCompletion?: boolean }> => {
+    try {
+      const response = await fetch(`${BASE_URL}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, name }),
+      });
 
-    // Add user to our mock database (profile not completed yet)
-    setRegisteredUsers((prev) => ({
-      ...(prev || {}),
-      [email]: { email, password, name, profileCompleted: false }
-    }))
+      const data = await response.json();
 
-    // Don't auto sign-in yet - user needs to complete profile
-    return { success: true, needsProfileCompletion: true }
-  }
-
-  const signOut = () => {
-    setUser(null)
-  }
-
-  const finalizeAccount = async (email: string, name: string, profileData: ProfileData): Promise<void> => {
-    // Mark profile as completed in the database
-    setRegisteredUsers((prev) => ({
-      ...(prev || {}),
-      [email]: { 
-        ...(prev?.[email] || { email, password: "", name }), 
-        profileCompleted: true 
+      if (response.ok && data.success) {
+        return { success: true, needsProfileCompletion: true };
+      } else {
+        console.error("Signup failed:", data.message);
+        return { success: false };
       }
-    }))
-
-    // Save the complete profile data
-    await window.spark.kv.set("user-profile", {
-      name,
-      age: profileData.age,
-      location: profileData.location,
-      bio: profileData.bio,
-      interests: profileData.interests,
-      photos: profileData.photo ? [profileData.photo] : [],
-      religion: profileData.religion,
-      languages: profileData.languages,
-      profession: "Professional", // Default
-      phoneNumber: profileData.phoneNumber
-    })
-
-    // Save user's discovery preferences based on their sign-up choices
-    await window.spark.kv.set("user-discovery-preferences", {
-      ageRange: profileData.ageRangePreference,
-      location: profileData.location,
-      interests: profileData.interests,
-      religion: [profileData.religion]
-    })
-
-    // Now authenticate the user as a new user
-    const authenticatedUser: User = {
-      id: email,
-      email,
-      name,
-      isAuthenticated: true,
-      profileCompleted: true,
-      isNewUser: true // New user who just completed profile
+    } catch (error) {
+      console.error("Error signing up:", error);
+      return { success: false };
     }
-    setUser(authenticatedUser)
-  }
+  };
 
-  const deleteAccount = async () => {
-    if (user) {
-      // Remove user from registered users
-      setRegisteredUsers((prev) => {
-        if (!prev) return {}
-        const updated = { ...prev }
-        delete updated[user.email]
-        return updated
-      })
-      
-      // Clear user session
-      setUser(null)
-      
-      // Clear all user data (profile, matches, etc.)
-      // Note: In a real app, this would be handled by the backend
-      await window.spark.kv.delete("user-profile")
-      await window.spark.kv.delete("user-matches")
-      await window.spark.kv.delete("user-messages")
-    }
-  }
+  const signOut = () => setUser(null);
+
+  const finalizeAccount = async () => {
+    console.log("Finalize profile — not yet connected to backend");
+  };
 
   const updateUser = (updates: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...updates })
-    }
-  }
+    if (user) setUser({ ...user, ...updates });
+  };
 
   return (
-    <AuthContext.Provider value={{
-      user: user || null,
-      signIn,
-      signUp,
-      signOut,
-      deleteAccount,
-      finalizeAccount,
-      updateUser,
-      isAuthenticated: !!(user?.isAuthenticated)
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        signIn,
+        signUp,
+        signOut,
+        finalizeAccount,
+        updateUser,
+        isAuthenticated: !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
+  return context;
 }

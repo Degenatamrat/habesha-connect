@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react"
-import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical, Check, X, Trash, User } from "@phosphor-icons/react"
+import { PaperPlaneRight, Image, Microphone, ArrowLeft, DotsThreeVertical } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
 import { useKV } from "@github/spark/hooks"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -13,7 +12,7 @@ interface Message {
   senderId: string
   text: string
   timestamp: string
-  type: 'text' | 'image' | 'audio'
+  type: "text" | "image" | "audio"
   imageUrl?: string
   audioUrl?: string
   audioDuration?: number
@@ -23,59 +22,10 @@ interface Chat {
   id: string
   matchId: string
   matchName: string
-  matchPhoto: string
+  matchPhoto?: string
   messages: Message[]
   lastActive: string
 }
-
-const sampleChats: Chat[] = [
-  {
-    id: "chat-1",
-    matchId: "1", 
-    matchName: "Rahel",
-    matchPhoto: "https://images.unsplash.com/photo-1494790108755-2616b612b47c?w=100&h=100&fit=crop",
-    lastActive: "Online",
-    messages: [
-      {
-        id: "msg-1",
-        senderId: "1",
-        text: "Hey! How are you doing? 😊",
-        timestamp: "2:30 PM",
-        type: 'text'
-      },
-      {
-        id: "msg-2", 
-        senderId: "me",
-        text: "Hi Rahel! I'm doing great, thanks for asking. How about you?",
-        timestamp: "2:32 PM",
-        type: 'text'
-      },
-      {
-        id: "msg-3",
-        senderId: "1", 
-        text: "I'm wonderful! I saw you love coffee too. Have you tried the Ethiopian coffee place in DIFC?",
-        timestamp: "2:35 PM",
-        type: 'text'
-      }
-    ]
-  },
-  {
-    id: "chat-3",
-    matchId: "3",
-    matchName: "Meron", 
-    matchPhoto: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop",
-    lastActive: "2 hours ago",
-    messages: [
-      {
-        id: "msg-4",
-        senderId: "3",
-        text: "Nice to meet you! I love your photos from the hiking trip.",
-        timestamp: "Yesterday",
-        type: 'text'
-      }
-    ]
-  }
-]
 
 interface MessagesPageProps {
   activeMatchId?: string
@@ -84,648 +34,246 @@ interface MessagesPageProps {
 }
 
 export default function MessagesPage({ activeMatchId, onBackToMatches, onStartChat }: MessagesPageProps) {
-  const [chats, setChats] = useKV<Chat[]>("user-chats", sampleChats)
+  const [chats, setChats] = useKV<Chat[]>("user-chats", [])
   const [newMessage, setNewMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [showRecordingControls, setShowRecordingControls] = useState(false)
-  const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
-  const [isCancelled, setIsCancelled] = useState(false)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
   const streamRef = useRef<MediaStream | null>(null)
-  const recordButtonRef = useRef<HTMLButtonElement>(null)
-  const initialTouchPos = useRef<{ x: number; y: number } | null>(null)
-  const isMobile = useIsMobile()
 
-  const activeChat = chats?.find(chat => chat.matchId === activeMatchId)
+  const activeChat = chats?.find((c) => c.matchId === activeMatchId)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  useEffect(() => scrollToBottom(), [activeChat?.messages])
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [activeChat?.messages])
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
 
+  // ---------- Send Message ----------
   const sendMessage = () => {
-    if (!newMessage.trim() || !activeChat) return
-
-    const message: Message = {
+    if (!newMessage.trim()) return
+    const msg: Message = {
       id: `msg-${Date.now()}`,
       senderId: "me",
       text: newMessage.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'text'
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      type: "text",
     }
 
-    setChats(currentChats => 
-      (currentChats || []).map(chat => 
-        chat.id === activeChat.id 
-          ? { ...chat, messages: [...chat.messages, message] }
-          : chat
+    if (activeChat) {
+      setChats((prev) =>
+        (prev || []).map((c) =>
+          c.id === activeChat.id ? { ...c, messages: [...c.messages, msg] } : c
+        )
       )
-    )
+    } else {
+      const newChat: Chat = {
+        id: `chat-${Date.now()}`,
+        matchId: "temp",
+        matchName: "Someone",
+        messages: [msg],
+        lastActive: "Online",
+      }
+      setChats([...(chats || []), newChat])
+    }
 
     setNewMessage("")
+    scrollToBottom()
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  const handleImageUpload = () => {
-    fileInputRef.current?.click()
-  }
-
+  // ---------- Image Upload ----------
+  const handleImageUpload = () => fileInputRef.current?.click()
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !activeChat) return
+    if (!file) return
+    if (!file.type.startsWith("image/")) return toast.error("Please select an image file")
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5MB")
 
-    if (!file.type.startsWith('image/')) {
-      toast.error("Please select an image file")
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast.error("Image must be less than 5MB")
-      return
-    }
-
-    // Create a URL for the image
     const imageUrl = URL.createObjectURL(file)
-    
-    const message: Message = {
+    const msg: Message = {
       id: `msg-${Date.now()}`,
       senderId: "me",
       text: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'image',
-      imageUrl: imageUrl
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      type: "image",
+      imageUrl,
     }
 
-    setChats(currentChats => 
-      (currentChats || []).map(chat => 
-        chat.id === activeChat.id 
-          ? { ...chat, messages: [...chat.messages, message] }
-          : chat
+    if (activeChat) {
+      setChats((prev) =>
+        (prev || []).map((c) =>
+          c.id === activeChat.id ? { ...c, messages: [...c.messages, msg] } : c
+        )
       )
-    )
-
+    }
     toast.success("Image sent!")
-    // Reset file input
     e.target.value = ""
   }
 
+  // ---------- Audio Recording ----------
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
       audioChunksRef.current = []
-      
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
-        }
+      recorder.start()
+
+      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data)
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" })
+        const url = URL.createObjectURL(audioBlob)
+        setRecordedBlob(audioBlob)
+        setRecordedAudioUrl(url)
+        setRecordingTime(0)
+        stream.getTracks().forEach((t) => t.stop())
       }
-      
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        const audioUrl = URL.createObjectURL(audioBlob)
-        
-        if (!isCancelled) {
-          if (isMobile) {
-            // Mobile: Auto-send on release (WhatsApp style)
-            sendRecordedMessageDirectly(audioBlob, audioUrl)
-          } else {
-            // Desktop: Show controls to confirm send
-            setRecordedAudioBlob(audioBlob)
-            setRecordedAudioUrl(audioUrl)
-            setShowRecordingControls(true)
-          }
-        } else {
-          // Clean up if cancelled
-          URL.revokeObjectURL(audioUrl)
-          setIsCancelled(false)
-        }
-      }
-      
-      mediaRecorder.start(100) // Collect data every 100ms
+
       setIsRecording(true)
       setRecordingTime(0)
-      
-      // Start timer
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
-      }, 1000)
-      
-    } catch (error) {
-      console.error('Error accessing microphone:', error)
-      toast.error("Could not access microphone. Please check permissions.")
+      recordingIntervalRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
+    } catch {
+      toast.error("Microphone access denied")
     }
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-      
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current)
-        recordingIntervalRef.current = null
-      }
-      
-      // Stop all tracks
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-        streamRef.current = null
-      }
-    }
-  }
-
-  const handleRecordingStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    
-    if (isMobile) {
-      // Mobile: Touch start to record
-      if ('touches' in e) {
-        initialTouchPos.current = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY
-        }
-      }
-      if (!isRecording) {
-        startRecording()
-      }
-    } else {
-      // Desktop: Click to start/stop recording
-      if (isRecording) {
-        stopRecording()
-      } else {
-        startRecording()
-      }
-    }
-  }
-
-  const handleRecordingEnd = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    
-    if (isMobile && isRecording) {
-      // Mobile: Check if user slid away to cancel
-      let shouldCancel = false
-      
-      if ('changedTouches' in e && initialTouchPos.current) {
-        const touch = e.changedTouches[0]
-        const deltaY = Math.abs(touch.clientY - initialTouchPos.current.y)
-        const deltaX = Math.abs(touch.clientX - initialTouchPos.current.x)
-        
-        // Cancel if user slid more than 50px away
-        shouldCancel = deltaY > 50 || deltaX > 50
-      }
-      
-      if (shouldCancel) {
-        setIsCancelled(true)
-        toast("Recording cancelled", { description: "Slide up to cancel" })
-      }
-      
-      stopRecording()
-      initialTouchPos.current = null
-    }
-  }
-
-  const handleRecordingMove = (e: React.TouchEvent) => {
-    if (isMobile && isRecording && initialTouchPos.current) {
-      const touch = e.touches[0]
-      const deltaY = touch.clientY - initialTouchPos.current.y
-      const deltaX = Math.abs(touch.clientX - initialTouchPos.current.x)
-      
-      // Visual feedback for cancel gesture
-      if (deltaY < -30 || deltaX > 30) {
-        // User is sliding to cancel - could add visual feedback here
-      }
-    }
-  }
-
-  const sendRecordedMessage = () => {
-    if (!recordedAudioUrl || !activeChat || recordingTime === 0) return
-
-    const message: Message = {
-      id: `msg-${Date.now()}`,
-      senderId: "me",
-      text: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'audio',
-      audioUrl: recordedAudioUrl,
-      audioDuration: recordingTime
-    }
-
-    setChats(currentChats => 
-      (currentChats || []).map(chat => 
-        chat.id === activeChat.id 
-          ? { ...chat, messages: [...chat.messages, message] }
-          : chat
-      )
-    )
-    
-    toast.success("Voice message sent!")
-    cancelRecording()
-  }
-
-  const sendRecordedMessageDirectly = (audioBlob: Blob, audioUrl: string) => {
-    if (!activeChat || recordingTime === 0) return
-
-    const message: Message = {
-      id: `msg-${Date.now()}`,
-      senderId: "me",
-      text: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'audio',
-      audioUrl: audioUrl,
-      audioDuration: recordingTime
-    }
-
-    setChats(currentChats => 
-      (currentChats || []).map(chat => 
-        chat.id === activeChat.id 
-          ? { ...chat, messages: [...chat.messages, message] }
-          : chat
-      )
-    )
-    
-    toast.success("Voice message sent!")
-    
-    // Clean up
-    setRecordingTime(0)
+    mediaRecorderRef.current?.stop()
+    clearInterval(recordingIntervalRef.current!)
     setIsRecording(false)
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current)
-      recordingIntervalRef.current = null
-    }
   }
 
-  const cancelRecording = () => {
-    if (recordedAudioUrl) {
-      URL.revokeObjectURL(recordedAudioUrl)
+  const sendAudio = () => {
+    if (!recordedAudioUrl) return
+    const msg: Message = {
+      id: `msg-${Date.now()}`,
+      senderId: "me",
+      text: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      type: "audio",
+      audioUrl: recordedAudioUrl,
+      audioDuration: recordingTime,
     }
-    setRecordedAudioBlob(null)
+    if (activeChat) {
+      setChats((prev) =>
+        (prev || []).map((c) =>
+          c.id === activeChat.id ? { ...c, messages: [...c.messages, msg] } : c
+        )
+      )
+    }
     setRecordedAudioUrl(null)
-    setShowRecordingControls(false)
-    setRecordingTime(0)
+    setRecordedBlob(null)
+    toast.success("Voice message sent!")
   }
 
-  const handleProfileClick = (matchId: string) => {
-    // Navigate to the profile or start a new chat with this person
-    if (onStartChat) {
-      onStartChat(matchId)
-    }
-  }
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current)
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-      if (recordedAudioUrl) {
-        URL.revokeObjectURL(recordedAudioUrl)
-      }
-    }
-  }, [])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  // Chat List View
-  if (!activeMatchId) {
-    const userChats = chats || []
-    
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex-shrink-0 p-4 pb-2">
-          <h1 className="text-xl font-bold text-foreground mb-1">Messages</h1>
-          <p className="text-muted-foreground text-sm">
-            {userChats.length} active {userChats.length === 1 ? 'conversation' : 'conversations'}
-          </p>
-        </div>
-
-        <div className="flex-1 overflow-auto px-4 pb-4">
-          {userChats.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <Card className="text-center w-full max-w-sm">
-                <CardContent className="p-6">
-                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                    <PaperPlaneRight className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">No messages yet</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Start a conversation with your matches!
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {userChats.map((chat) => {
-                const lastMessage = chat.messages[chat.messages.length - 1]
-                return (
-                  <Card key={chat.id} className="hover:shadow-md transition-shadow cursor-pointer active:scale-98 transition-transform">
-                    <CardContent className="p-3" onClick={() => onStartChat?.(chat.matchId)}>
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div 
-                            className="cursor-pointer group"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleProfileClick(chat.matchId)
-                            }}
-                          >
-                            <img 
-                              src={chat.matchPhoto} 
-                              alt={chat.matchName}
-                              className="w-12 h-12 rounded-full object-cover group-hover:ring-2 group-hover:ring-primary/50 transition-all"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-full transition-colors flex items-center justify-center">
-                              <User className="w-3 h-3 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
-                            </div>
-                          </div>
-                          {chat.lastActive === "Online" && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold truncate text-sm">{chat.matchName}</h3>
-                            <span className="text-xs text-muted-foreground">{chat.lastActive}</span>
-                          </div>
-                          {lastMessage && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {lastMessage.senderId === "me" ? "You: " : ""}{lastMessage.text}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Individual Chat View
-  if (!activeChat) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground">Chat not found</p>
-      </div>
-    )
-  }
-
+  // ---------- UI ----------
   return (
     <div className="h-full flex flex-col">
-      {/* Chat Header */}
-      <div className="bg-card/95 backdrop-blur-sm border-b border-border/50 px-4 py-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBackToMatches} className="p-1">
+      {/* Header */}
+      <div className="bg-card/90 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
+        {activeChat && (
+          <Button variant="ghost" size="sm" onClick={onBackToMatches}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          
-          <div 
-            className="relative cursor-pointer group"
-            onClick={() => handleProfileClick(activeChat.matchId)}
-          >
-            <img 
-              src={activeChat.matchPhoto} 
+        )}
+        {activeChat && (
+          <>
+            <img
+              src={activeChat.matchPhoto || "https://via.placeholder.com/100?text=User"}
               alt={activeChat.matchName}
-              className="w-9 h-9 rounded-full object-cover group-hover:ring-2 group-hover:ring-primary/50 transition-all"
+              className="w-9 h-9 rounded-full object-cover"
             />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-full transition-colors flex items-center justify-center">
-              <User className="w-4 h-4 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-sm truncate">{activeChat.matchName}</h2>
+              <p className="text-xs text-muted-foreground">{activeChat.lastActive}</p>
             </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-sm truncate">{activeChat.matchName}</h2>
-            <p className="text-xs text-muted-foreground truncate">{activeChat.lastActive}</p>
-          </div>
-          
-          <Button variant="ghost" size="sm" className="p-1">
-            <DotsThreeVertical className="w-5 h-5" />
-          </Button>
-        </div>
+            <DotsThreeVertical className="w-5 h-5 opacity-70" />
+          </>
+        )}
+        {!activeChat && <h2 className="font-semibold text-base">Messages</h2>}
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-muted/20">
-        {activeChat.messages.map((message) => (
-          <div 
-            key={message.id}
-            className={cn(
-              "flex",
-              message.senderId === "me" ? "justify-end" : "justify-start"
-            )}
-          >
-            <div className={cn(
-              "max-w-[85%] rounded-2xl shadow-sm",
-              message.senderId === "me" 
-                ? "bg-primary text-primary-foreground rounded-br-md"
-                : "bg-card text-foreground rounded-bl-md border border-border/50"
-            )}>
-              {message.type === 'text' && (
-                <div className="px-3 py-2">
-                  <p className="text-sm leading-relaxed">{message.text}</p>
-                </div>
-              )}
-              
-              {message.type === 'image' && message.imageUrl && (
-                <div className="p-1">
-                  <img 
-                    src={message.imageUrl} 
-                    alt="Shared image" 
-                    className="max-w-full rounded-xl max-h-64 object-cover"
-                  />
-                </div>
-              )}
-              
-              {message.type === 'audio' && message.audioUrl && (
-                <div className="px-3 py-2 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center">
-                    <Microphone className="w-3 h-3" />
+        {activeChat?.messages?.length ? (
+          activeChat.messages.map((m) => (
+            <div key={m.id} className={cn("flex", m.senderId === "me" ? "justify-end" : "justify-start")}>
+              <div
+                className={cn(
+                  "max-w-[80%] rounded-2xl shadow-sm",
+                  m.senderId === "me"
+                    ? "bg-primary text-primary-foreground rounded-br-md"
+                    : "bg-card border border-border/50 rounded-bl-md"
+                )}
+              >
+                {m.type === "text" && (
+                  <div className="px-3 py-2">
+                    <p className="text-sm leading-relaxed">{m.text}</p>
                   </div>
-                  <div className="flex-1">
-                    <audio controls className="w-full h-8" style={{ maxWidth: '200px' }}>
-                      <source src={message.audioUrl} type="audio/wav" />
+                )}
+                {m.type === "image" && m.imageUrl && (
+                  <img src={m.imageUrl} alt="Sent" className="max-w-full rounded-xl max-h-64 object-cover" />
+                )}
+                {m.type === "audio" && m.audioUrl && (
+                  <div className="px-3 py-2 flex items-center gap-2">
+                    <Microphone className="w-4 h-4 opacity-70" />
+                    <audio controls className="h-8 w-full" style={{ maxWidth: "200px" }}>
+                      <source src={m.audioUrl} type="audio/wav" />
                     </audio>
+                    {m.audioDuration && <span className="text-xs opacity-70">{formatTime(m.audioDuration)}</span>}
                   </div>
-                  {message.audioDuration && (
-                    <span className="text-xs opacity-70">{formatTime(message.audioDuration)}</span>
-                  )}
-                </div>
-              )}
-              
-              <div className={cn(
-                "px-3 pb-2 pt-0",
-                message.type === 'image' && "pt-1"
-              )}>
-                <p className={cn(
-                  "text-xs",
-                  message.senderId === "me" 
-                    ? "text-primary-foreground/70"
-                    : "text-muted-foreground"
-                )}>
-                  {message.timestamp}
-                </p>
+                )}
+                <div className="px-3 pb-2 text-xs text-muted-foreground/70">{m.timestamp}</div>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+            <p className="mb-2 text-sm">Start a conversation 💬</p>
+            <p className="text-xs opacity-70">Type something below to begin</p>
           </div>
-        ))}
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
-      <div className="bg-card/95 backdrop-blur-sm border-t border-border/50 p-3 flex-shrink-0 safe-area-inset-bottom">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          accept="image/*"
-          className="hidden"
+      {/* Input — always visible */}
+      <div className="bg-card/90 backdrop-blur-sm border-t p-3 flex items-end gap-2">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+        <Button variant="ghost" size="sm" onClick={handleImageUpload}>
+          <Image className="w-5 h-5" />
+        </Button>
+
+        {isRecording ? (
+          <Button variant="destructive" size="sm" onClick={stopRecording}>
+            ⏺ Stop ({formatTime(recordingTime)})
+          </Button>
+        ) : recordedAudioUrl ? (
+          <Button variant="outline" size="sm" onClick={sendAudio}>
+            🎤 Send
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={startRecording}>
+            <Microphone className="w-5 h-5" />
+          </Button>
+        )}
+
+        <Input
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="Type a message..."
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          className="rounded-2xl bg-muted/40 border-0 focus-visible:ring-1 flex-1 py-2"
         />
-        
-        {/* Recording Controls - Show when audio is recorded */}
-        {showRecordingControls && recordedAudioUrl && (
-          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-2xl mb-2">
-            <div className="flex items-center gap-2 flex-1">
-              <Microphone className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium">Voice message ({formatTime(recordingTime)})</span>
-              <audio controls className="flex-1 max-w-xs h-8">
-                <source src={recordedAudioUrl} type="audio/wav" />
-              </audio>
-            </div>
-            <Button 
-              onClick={sendRecordedMessage}
-              size="sm" 
-              className="rounded-full w-10 h-10 p-0"
-            >
-              <Check className="w-4 h-4" />
-            </Button>
-            <Button 
-              onClick={cancelRecording}
-              size="sm" 
-              variant="outline"
-              className="rounded-full w-10 h-10 p-0"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-        
-        {/* Recording Indicator - Show while recording */}
-        {isRecording && (
-          <div className="flex items-center gap-3 p-4 bg-destructive/10 rounded-2xl mb-2 border border-destructive/20">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-destructive font-medium">
-                Recording: {formatTime(recordingTime)}
-              </span>
-              <div className="flex-1 bg-red-100 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-red-500 transition-all duration-1000 ease-out"
-                  style={{ width: `${Math.min((recordingTime / 60) * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-            <div className="text-center">
-              <span className="text-xs text-destructive font-medium block">
-                {isMobile ? "Release to send" : "Click mic to stop"}
-              </span>
-              {isMobile && (
-                <span className="text-xs text-muted-foreground block mt-1">
-                  Slide away to cancel
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Text Input - Always show unless actively recording */}
-        {!isRecording && (
-          <div className="flex items-end gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="p-2 flex-shrink-0"
-              onClick={handleImageUpload}
-            >
-              <Image className="w-5 h-5" />
-            </Button>
-            
-            <div className="flex-1 min-w-0">
-              <Input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                className="border-0 focus-visible:ring-1 rounded-2xl bg-muted/50 resize-none min-h-[40px] py-2"
-              />
-            </div>
-            
-            {/* Send button appears when there's text */}
-            {newMessage.trim() ? (
-              <Button 
-                onClick={sendMessage}
-                variant="default"
-                size="sm"
-                className="p-2 flex-shrink-0 rounded-full w-10 h-10"
-              >
-                <PaperPlaneRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              /* Voice recording button shows when no text and no recording controls */
-              !showRecordingControls && (
-                <Button 
-                  ref={recordButtonRef}
-                  onMouseDown={!isMobile ? handleRecordingStart : undefined}
-                  onMouseUp={!isMobile ? undefined : undefined}
-                  onMouseLeave={isMobile ? handleRecordingEnd : undefined}
-                  onTouchStart={isMobile ? handleRecordingStart : undefined}
-                  onTouchEnd={isMobile ? handleRecordingEnd : undefined}
-                  onTouchMove={isMobile ? handleRecordingMove : undefined}
-                  onClick={!isMobile ? handleRecordingStart : undefined}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "p-2 flex-shrink-0 rounded-full w-10 h-10 select-none",
-                    isRecording && "bg-destructive/20 text-destructive scale-110 transition-transform"
-                  )}
-                  title={isMobile ? "Hold to record voice message" : isRecording ? "Click to stop recording" : "Click to start recording"}
-                >
-                  <Microphone className="w-5 h-5" />
-                </Button>
-              )
-            )}
-          </div>
-        )}
+
+        <Button onClick={sendMessage} size="sm" className="rounded-full w-10 h-10">
+          <PaperPlaneRight className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   )

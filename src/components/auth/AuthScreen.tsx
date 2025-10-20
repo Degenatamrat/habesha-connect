@@ -1,93 +1,94 @@
-import { useState } from "react"
-import { Heart, Envelope, Lock, User, Eye, EyeSlash } from "@phosphor-icons/react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAuth } from "./AuthContext"
-import { toast } from "sonner"
-import ProfileCompletion from "@/components/onboarding/ProfileCompletion"
+import { useState } from "react";
+import { Heart, Envelope, Lock, User, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "./AuthContext";
+import { toast } from "sonner";
+import ProfileCompletion from "@/components/onboarding/ProfileCompletion";
 
 export default function AuthScreen() {
-  const { signIn, signUp } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showProfileCompletion, setShowProfileCompletion] = useState(false)
-  const [pendingUser, setPendingUser] = useState<{ email: string; name: string } | null>(null)
-  
-  // Sign In form
-  const [signInEmail, setSignInEmail] = useState("")
-  const [signInPassword, setSignInPassword] = useState("")
-  
-  // Sign Up form
-  const [signUpName, setSignUpName] = useState("")
-  const [signUpEmail, setSignUpEmail] = useState("")
-  const [signUpPassword, setSignUpPassword] = useState("")
+  const { signIn, signUp } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
+  const [pendingUser, setPendingUser] = useState<{ email: string; name: string } | null>(null);
 
+  // Sign In form
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+
+  // Sign Up form
+  const [signUpName, setSignUpName] = useState("");
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+
+  // ==== SIGN IN ====
   const handleSignIn = async () => {
     if (!signInEmail || !signInPassword) {
-      toast.error("Please fill in all fields")
-      return
+      toast.error("Please fill in all fields");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const success = await signIn(signInEmail, signInPassword)
+      const success = await signIn(signInEmail, signInPassword);
       if (success) {
-        toast.success("Welcome back!")
+        toast.success("Welcome back!");
       } else {
-        toast.error("Invalid email or password")
+        toast.error("Invalid email or password");
       }
     } catch (error) {
-      toast.error("Sign in failed. Please try again.")
+      toast.error("Sign in failed. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
+  // ==== SIGN UP ====
   const handleSignUp = async () => {
     if (!signUpName || !signUpEmail || !signUpPassword) {
-      toast.error("Please fill in all fields")
-      return
+      toast.error("Please fill in all fields");
+      return;
     }
 
     if (signUpPassword.length < 6) {
-      toast.error("Password must be at least 6 characters")
-      return
+      toast.error("Password must be at least 6 characters");
+      return;
     }
 
-    if (!signUpEmail.includes('@')) {
-      toast.error("Please enter a valid email")
-      return
+    if (!signUpEmail.includes("@")) {
+      toast.error("Please enter a valid email");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const result = await signUp(signUpEmail, signUpPassword, signUpName)
+      const result = await signUp(signUpEmail, signUpPassword, signUpName);
       if (result.success) {
-        if (result.needsProfileCompletion) {
-          setPendingUser({ email: signUpEmail, name: signUpName })
-          setShowProfileCompletion(true)
-          toast.success("Account created! Let's complete your profile.")
-        }
+        // ✅ Always go to profile completion after signup
+        setPendingUser({ email: signUpEmail, name: signUpName });
+        setShowProfileCompletion(true);
+        toast.success("Account created! Let's complete your profile.");
       } else {
-        toast.error("An account with this email already exists")
+        toast.error("An account with this email already exists");
       }
     } catch (error) {
-      toast.error("Sign up failed. Please try again.")
+      toast.error("Sign up failed. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleProfileCompletion = () => {
-    setShowProfileCompletion(false)
-    setPendingUser(null)
-    // The user is now authenticated via the finalizeAccount call
-  }
+    setShowProfileCompletion(false);
+    setPendingUser(null);
+    toast.success("Profile setup complete!");
+  };
 
-  // Show profile completion screen if needed
+  // ==== SHOW PROFILE COMPLETION SCREEN ====
   if (showProfileCompletion && pendingUser) {
     return (
       <ProfileCompletion
@@ -95,9 +96,10 @@ export default function AuthScreen() {
         userName={pendingUser.name}
         onComplete={handleProfileCompletion}
       />
-    )
+    );
   }
 
+  // ==== MAIN AUTH SCREEN ====
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 p-6 flex items-center justify-center">
       <div className="max-w-md w-full">
@@ -121,6 +123,7 @@ export default function AuthScreen() {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
+              {/* SIGN IN TAB */}
               <TabsContent value="signin" className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
@@ -156,24 +159,17 @@ export default function AuthScreen() {
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeSlash className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleSignIn}
-                  className="w-full mt-6"
-                  disabled={isLoading}
-                >
+                <Button onClick={handleSignIn} className="w-full mt-6" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </TabsContent>
 
+              {/* SIGN UP TAB */}
               <TabsContent value="signup" className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Full Name</Label>
@@ -224,20 +220,12 @@ export default function AuthScreen() {
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? (
-                        <EyeSlash className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeSlash className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleSignUp}
-                  className="w-full mt-6"
-                  disabled={isLoading}
-                >
+                <Button onClick={handleSignUp} className="w-full mt-6" disabled={isLoading}>
                   {isLoading ? "Creating account..." : "Create Account"}
                 </Button>
 
@@ -254,11 +242,9 @@ export default function AuthScreen() {
           <p className="text-sm text-muted-foreground italic">
             "በቀላል ቃል እንዲህ ይላል - ለኢትዮጵያዊያን ፍቅር"
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            "In simple words - Love for Ethiopians"
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">"In simple words - Love for Ethiopians"</p>
         </div>
       </div>
     </div>
-  )
+  );
 }
