@@ -30,7 +30,11 @@ interface AuthContextType {
     name: string
   ) => Promise<{ success: boolean; needsProfileCompletion?: boolean }>;
   signOut: () => void;
-  finalizeAccount: (email: string, name: string, profileData: ProfileData) => Promise<void>;
+  finalizeAccount: (
+    email: string,
+    name: string,
+    profileData: ProfileData
+  ) => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
 }
@@ -44,8 +48,8 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
 
-  // ✅ Updated to use your local backend
-  const BASE_URL = "http://localhost:4000";
+  // ✅ Updated to use your live Render backend instead of localhost
+  const BASE_URL = "https://habesha-connect-backend.onrender.com";
 
   // ==== SIGN IN ====
   const signIn = async (email: string, password: string): Promise<boolean> => {
