@@ -1,90 +1,98 @@
 // index.js
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+const express = require('express')
+const cors = require('cors')
+const { Pool } = require('pg')
+require('dotenv').config()
 
-const app = express(); // ✅ define app first
-app.use(cors());
-app.use(express.json()); // ✅ enable JSON parsing
+const app = express()
+app.use(cors())
+app.use(express.json())
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4000
 
-// ===== Base Route =====
+// === Connect to PostgreSQL ===
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+})
+
+// === Create users table if it doesn’t exist ===
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      profile_completed BOOLEAN DEFAULT false
+    );
+  `)
+  console.log('✅ PostgreSQL connected & users table ready')
+}
+initDB()
+
+// === Base route ===
 app.get('/', (req, res) => {
-  res.send('Hello from the backend!');
-});
+  res.send('Hello from the live backend!')
+})
 
-// ===== Database Test Route =====
-app.get('/dbtest', async (req, res) => {
-  try {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
-    });
+// === Signup route ===
+app.post('/signup', async (req, res) => {
+  const { name, email, password } = req.body
 
-    const result = await pool.query('SELECT NOW()');
-    res.send(`Database connected! Current time: ${result.rows[0].now}`);
-    await pool.end();
-  } catch (err) {
-    res.status(500).send('Database error: ' + err.message);
-  }
-});
-
-// ===== Simple Auth Routes =====
-
-// Temporary in-memory store (replace with DB later)
-const users = [];
-
-// ===== Signup Route =====
-app.post('/signup', (req, res) => {
-  const { name, email, password } = req.body;
-
-  // Basic validation
   if (!name || !email || !password) {
-    return res.status(400).json({ success: false, message: 'All fields are required.' });
+    return res.status(400).json({ success: false, message: 'All fields are required.' })
   }
 
-  // Check if email already exists
-  const existingUser = users.find(u => u.email === email);
-  if (existingUser) {
-    return res.status(409).json({ success: false, message: 'User already exists.' });
-  }
-
-  // ✅ Mark profile as incomplete by default
-  const newUser = { name, email, password, profileCompleted: false };
-  users.push(newUser);
-
-  // ✅ Tell frontend to show the profile completion screen
-  res.status(201).json({
-    success: true,
-    user: newUser,
-    needsProfileCompletion: true
-  });
-});
-
-// ===== Login Route =====
-app.post('/login', (req, res) => {
-  const { email, password } = req.body;
-
-  // Find user
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid credentials.' });
-  }
-
-  // ✅ Return user's profileCompleted status
-  res.json({
-    success: true,
-    user: {
-      name: user.name,
-      email: user.email,
-      profileCompleted: user.profileCompleted
+  try {
+    const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ success: false, message: 'User already exists.' })
     }
-  });
-});
 
-// ===== Start Server =====
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
+      [name, email, password]
+    )
+
+    res.status(201).json({
+      success: true,
+      user: result.rows[0],
+      needsProfileCompletion: true,
+    })
+  } catch (err) {
+    console.error('Signup error:', err.message)
+    res.status(500).json({ success: false, message: 'Database error during signup.' })
+  }
+})
+
+// === Login route ===
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+    const user = result.rows[0]
+
+    if (!user || user.password !== password) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials.' })
+    }
+
+    res.json({
+      success: true,
+      user: {
+        name: user.name,
+        email: user.email,
+        profileCompleted: user.profile_completed,
+      },
+    })
+  } catch (err) {
+    console.error('Login error:', err.message)
+    res.status(500).json({ success: false, message: 'Database error during login.' })
+  }
+})
+
+// === Start server ===
 app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
-});
+  console.log(`🚀 Backend running on http://localhost:${PORT}`)
+})
