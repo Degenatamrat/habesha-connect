@@ -2,6 +2,7 @@
 const express = require('express')
 const cors = require('cors')
 const { Pool } = require('pg')
+const bcrypt = require('bcrypt')
 require('dotenv').config()
 
 const app = express()
@@ -33,10 +34,10 @@ initDB()
 
 // === Base route ===
 app.get('/', (req, res) => {
-  res.send('Hello from the live backend!')
+  res.send('Hello from the secure backend!')
 })
 
-// === Signup route ===
+// === Secure Signup route ===
 app.post('/signup', async (req, res) => {
   const { name, email, password } = req.body
 
@@ -50,14 +51,17 @@ app.post('/signup', async (req, res) => {
       return res.status(409).json({ success: false, message: 'User already exists.' })
     }
 
+    // 🔒 Hash the password before saving
+    const hashedPassword = await bcrypt.hash(password, 10)
+
     const result = await pool.query(
       'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
-      [name, email, password]
+      [name, email, hashedPassword]
     )
 
     res.status(201).json({
       success: true,
-      user: result.rows[0],
+      user: { id: result.rows[0].id, name, email },
       needsProfileCompletion: true,
     })
   } catch (err) {
@@ -66,21 +70,27 @@ app.post('/signup', async (req, res) => {
   }
 })
 
-// === Login route ===
+// === Secure Login route ===
 app.post('/login', async (req, res) => {
   const { email, password } = req.body
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email])
     const user = result.rows[0]
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials.' })
+    }
 
-    if (!user || user.password !== password) {
+    // 🔒 Compare typed password with hashed one
+    const isMatch = await bcrypt.compare(password, user.password)
+    if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' })
     }
 
     res.json({
       success: true,
       user: {
+        id: user.id,
         name: user.name,
         email: user.email,
         profileCompleted: user.profile_completed,
@@ -94,5 +104,5 @@ app.post('/login', async (req, res) => {
 
 // === Start server ===
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`)
+  console.log(`🚀 Backend running securely on http://localhost:${PORT}`)
 })
