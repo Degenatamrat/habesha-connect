@@ -48,8 +48,8 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
 
-  // ✅ Updated to use your live Render backend instead of localhost
-  const BASE_URL = "https://habesha-connect-backend.onrender.com";
+  // ✅ Permanent Render backend URL (PostgreSQL live)
+  const BASE_URL = "https://habesha-90nw.onrender.com";
 
   // ==== SIGN IN ====
   const signIn = async (email: string, password: string): Promise<boolean> => {
@@ -64,11 +64,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (response.ok && data.success) {
         const authenticatedUser: User = {
-          id: email,
+          id: data.user.id?.toString() || email,
           email: data.user.email,
           name: data.user.name,
           isAuthenticated: true,
-          profileCompleted: true,
+          profileCompleted: data.user.profileCompleted,
           isNewUser: false,
         };
         setUser(authenticatedUser);
