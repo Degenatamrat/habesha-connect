@@ -2,7 +2,7 @@
 const express = require('express')
 const cors = require('cors')
 const { Pool } = require('pg')
-const bcrypt = require('bcryptjs') // ✅ switched from bcrypt to bcryptjs
+const bcrypt = require('bcryptjs') // ✅ using bcryptjs for compatibility
 require('dotenv').config()
 
 const app = express()
@@ -35,6 +35,21 @@ async function initDB() {
 }
 initDB()
 
+// === Health check route for frontend/backend connection ===
+app.get('/dbtest', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()')
+    res.json({
+      success: true,
+      message: '✅ Backend connected to database successfully!',
+      timestamp: result.rows[0].now,
+    })
+  } catch (err) {
+    console.error('❌ DB Test Error:', err.message)
+    res.status(500).json({ success: false, message: 'Database connection failed.' })
+  }
+})
+
 // === Base route ===
 app.get('/', (req, res) => {
   res.send('Hello from the secure backend!')
@@ -54,7 +69,7 @@ app.post('/signup', async (req, res) => {
       return res.status(409).json({ success: false, message: 'User already exists.' })
     }
 
-    // 🔒 Hash the password before saving
+    // 🔒 Hash password before saving
     const hashedPassword = await bcrypt.hash(password, 10)
 
     const result = await pool.query(
@@ -152,7 +167,10 @@ app.post('/verify-otp', async (req, res) => {
     }
 
     // ✅ OTP verified successfully
-    await pool.query(`UPDATE users SET otp = NULL, otp_expires = NULL, profile_completed = TRUE WHERE phone = $1`, [phone])
+    await pool.query(
+      `UPDATE users SET otp = NULL, otp_expires = NULL, profile_completed = TRUE WHERE phone = $1`,
+      [phone]
+    )
     res.json({ success: true, message: 'OTP verified successfully.' })
   } catch (err) {
     console.error('OTP verify error:', err.message)
