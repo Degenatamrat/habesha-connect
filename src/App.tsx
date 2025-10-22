@@ -7,7 +7,7 @@ import ProfilePage from "@/components/profile/ProfilePage"
 import AdminAuth from "@/components/auth/AdminAuth"
 import AuthScreen from "@/components/auth/AuthScreen"
 import WelcomeScreen from "@/components/onboarding/WelcomeScreen"
-import ProfileCompletion from "@/components/onboarding/ProfileCompletion"
+import TinderFlow from "@/components/onboarding/TinderFlow" // ✅ replaced old ProfileCompletion
 import { AuthProvider, useAuth } from "@/components/auth/AuthContext"
 import { useKV } from "@github/spark/hooks"
 import { Toaster } from "@/components/ui/sonner"
@@ -20,7 +20,7 @@ function AppContent() {
   const [hasSeenWelcome, setHasSeenWelcome] = useKV<boolean>(`has-seen-welcome-${user?.id || 'guest'}`, false)
 
   useEffect(() => {
-    // Check if the current path is /admin
+    // Check if current path is /admin
     const path = window.location.pathname
     if (path === '/admin') {
       setIsAdminMode(true)
@@ -29,7 +29,6 @@ function AppContent() {
 
   const handleGetStarted = () => {
     setHasSeenWelcome(true)
-    // Clear the new user flag
     updateUser({ isNewUser: false })
   }
 
@@ -43,35 +42,29 @@ function AppContent() {
     setActiveTab("matches")
   }
 
-  // Admin mode - no layout wrapper
-  if (isAdminMode) {
-    return <AdminAuth />
-  }
+  // ✅ Admin mode — no layout
+  if (isAdminMode) return <AdminAuth />
 
-  // Show authentication screen if not logged in
-  if (!isAuthenticated) {
-    return <AuthScreen />
-  }
+  // ✅ If not authenticated → show Auth screen
+  if (!isAuthenticated) return <AuthScreen />
 
-  // If user is logged in but profile not completed, show profile completion
+  // ✅ If new user → show TinderFlow (OTP + profile steps)
   if (user && user.isAuthenticated && !user.profileCompleted) {
     return (
-      <ProfileCompletion
-        userEmail={user.email}
-        userName={user.name}
+      <TinderFlow
         onComplete={() => {
-          // Profile completion will handle authentication
-          // No additional action needed here
+          updateUser({ profileCompleted: true })
         }}
       />
     )
   }
 
-  // Show welcome screen only for new users who just completed their profile
+  // ✅ Show welcome screen for new users after onboarding
   if (user?.isNewUser && !hasSeenWelcome) {
     return <WelcomeScreen onGetStarted={handleGetStarted} />
   }
 
+  // ✅ Main content tabs
   const renderContent = () => {
     switch (activeTab) {
       case "discover":
@@ -80,7 +73,7 @@ function AppContent() {
         return <MatchesPage onStartChat={handleStartChat} />
       case "messages":
         return (
-          <MessagesPage 
+          <MessagesPage
             activeMatchId={activeChatMatchId}
             onBackToMatches={handleBackToMatches}
             onStartChat={handleStartChat}
@@ -110,4 +103,3 @@ function App() {
 }
 
 export default App
-
