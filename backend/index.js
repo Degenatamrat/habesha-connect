@@ -1,4 +1,4 @@
-// index.js (Phase 3: Cultural Intelligence Matching)
+// index.js (Phase 3: Cultural Intelligence Matching + Image Upload Ready)
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
@@ -7,7 +7,10 @@ require("dotenv").config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+
+// ✅ Allow larger JSON bodies (for base64 or image uploads)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const PORT = process.env.PORT || 4000;
 
@@ -178,29 +181,11 @@ app.post("/login", async (req, res) => {
 });
 
 /* ---------------------------- Profile CRUD ------------------------- */
-app.get("/profile/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const q = await pool.query(
-      `SELECT id, name, email, photo, gender, looking_for, bio,
-              interests, vibe, lifestyle, culture, faith, goals,
-              region, city, languages, faith_importance,
-              profile_completed, last_active_at, created_at
-       FROM users WHERE id=$1`,
-      [id]
-    );
-    if (!q.rowCount) return res.status(404).json({ success: false, message: "Not found." });
-    res.json({ success: true, user: q.rows[0] });
-  } catch {
-    res.status(500).json({ success: false, message: "Error fetching profile." });
-  }
-});
-
 app.put("/profile/update", async (req, res) => {
   const {
     id,
     name,
-    photo,
+    photo, // can now be base64 or URL
     gender,
     looking_for,
     bio,
@@ -263,157 +248,6 @@ app.put("/profile/update", async (req, res) => {
     res.json({ success: true, user: q.rows[0] });
   } catch {
     res.status(500).json({ success: false, message: "Error updating profile." });
-  }
-});
-
-/* -------------------------- Likes / Matches / Msgs ----------------------- */
-app.post("/like", async (req, res) => {
-  const { likerId, likedId } = req.body || {};
-  if (!likerId || !likedId || likerId === likedId)
-    return res.status(400).json({ success: false, message: "Invalid like." });
-
-  try {
-    await pool.query("INSERT INTO likes (liker_id, liked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [
-      likerId,
-      likedId,
-    ]);
-
-    const mutual = await pool.query("SELECT 1 FROM likes WHERE liker_id=$1 AND liked_id=$2", [
-      likedId,
-      likerId,
-    ]);
-    if (mutual.rowCount) {
-      const uid1 = Math.min(likerId, likedId);
-      const uid2 = Math.max(likerId, likedId);
-      await pool.query(
-        "INSERT INTO matches (user1_id, user2_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
-        [uid1, uid2]
-      );
-      return res.json({ success: true, matched: true });
-    }
-    res.json({ success: true, matched: false });
-  } catch {
-    res.status(500).json({ success: false, message: "Error recording like." });
-  }
-});
-
-app.get("/matches/:userId", async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const q = await pool.query(
-      `SELECT m.id as match_id,
-              CASE WHEN m.user1_id=$1 THEN m.user2_id ELSE m.user1_id END AS other_id,
-              u.name, u.photo, u.bio
-       FROM matches m
-       JOIN users u ON u.id = CASE WHEN m.user1_id=$1 THEN m.user2_id ELSE m.user1_id END
-       WHERE m.user1_id=$1 OR m.user2_id=$1
-       ORDER BY m.created_at DESC`,
-      [userId]
-    );
-    res.json({ success: true, matches: q.rows });
-  } catch {
-    res.status(500).json({ success: false, message: "Error fetching matches." });
-  }
-});
-
-app.post("/messages", async (req, res) => {
-  const { matchId, senderId, body } = req.body || {};
-  if (!matchId || !senderId || !body)
-    return res.status(400).json({ success: false, message: "Missing fields." });
-  try {
-    await pool.query("INSERT INTO messages (match_id, sender_id, body) VALUES ($1,$2,$3)", [
-      matchId,
-      senderId,
-      body,
-    ]);
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, message: "Error sending message." });
-  }
-});
-
-app.get("/messages/:matchId", async (req, res) => {
-  const { matchId } = req.params;
-  try {
-    const q = await pool.query(
-      "SELECT id, match_id, sender_id, body, created_at FROM messages WHERE match_id=$1 ORDER BY created_at ASC",
-      [matchId]
-    );
-    res.json({ success: true, messages: q.rows });
-  } catch {
-    res.status(500).json({ success: false, message: "Error fetching messages." });
-  }
-});
-
-/* ---------------------- Discover (Phase 3 Cultural Intelligence) -------------------- */
-app.get("/discover/:userId", async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const meQ = await pool.query("SELECT * FROM users WHERE id=$1", [userId]);
-    const me = meQ.rows[0];
-    if (!me) return res.status(404).json({ success: false, message: "User not found." });
-
-    const candidatesQ = await pool.query(
-      `SELECT * FROM users
-       WHERE id <> $1
-         AND gender IS NOT NULL
-         AND looking_for IS NOT NULL
-         AND gender = $2
-         AND $3 = looking_for`,
-      [userId, me.looking_for || null, me.gender || null]
-    );
-
-    const results = candidatesQ.rows.map((u) => {
-      const interestOverlap = arrOverlap(me.interests, u.interests);
-      const vibeOverlap = arrOverlap(me.vibe, u.vibe);
-      const lifestyleSim = lifestyleSimilarity(me.lifestyle || {}, u.lifestyle || {});
-      const cultureOverlap = arrOverlap(me.culture, u.culture);
-      const languageOverlap = arrOverlap(me.languages, u.languages);
-      const goalAlign = goalAlignment(me.goals, u.goals);
-      const faithMatch =
-        me.faith?.religion === u.faith?.religion
-          ? 0.7
-          : Math.abs((me.faith_importance || 3) - (u.faith_importance || 3)) < 2
-          ? 0.3
-          : 0;
-      const regionBoost = me.region && u.region && me.region === u.region ? 0.1 : 0;
-      let score =
-        0.25 * interestOverlap +
-        0.15 * vibeOverlap +
-        0.15 * cultureOverlap +
-        0.1 * languageOverlap +
-        0.1 * lifestyleSim +
-        0.1 * faithMatch +
-        0.05 * goalAlign +
-        regionBoost;
-      if (isNewWithin(u.created_at, 24)) score += 0.05;
-      return { ...u, compatibility_score: Math.min(1, score) };
-    });
-
-    results.sort((a, b) => b.compatibility_score - a.compatibility_score);
-    res.json({ success: true, results: results.slice(0, 50) });
-  } catch {
-    res.status(500).json({ success: false, message: "Error generating discover list." });
-  }
-});
-
-/* -------------------------- Recommendations -------------------------- */
-app.get("/recommend/:userId", async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const q = await pool.query(
-      `SELECT liked_id, COUNT(*) AS cnt
-       FROM likes
-       WHERE liker_id IN (SELECT liker_id FROM likes WHERE liked_id=$1)
-         AND liked_id <> $1
-       GROUP BY liked_id
-       ORDER BY cnt DESC
-       LIMIT 5;`,
-      [userId]
-    );
-    res.json({ success: true, recommendations: q.rows });
-  } catch {
-    res.status(500).json({ success: false, message: "Recommendation error." });
   }
 });
 
